@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ESP32 Studio</title>
+<title>FORGE32</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* ------------------------------------------------------------------
-   ESP32 Studio
+   FORGE32
    Direction: solder mask and gold pads. The substrate is dark green
    epoxy, the accents are ENIG gold, the labels are silkscreen.
    ------------------------------------------------------------------ */
@@ -58,13 +58,13 @@ button,input,select,textarea{font:inherit;color:inherit}
   grid-area:rail; background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);
   border-right:1px solid var(--trace);
   display:flex; flex-direction:column; align-items:center; gap:2px;
-  padding:7px 0; position:relative;
+  padding:7px 0 72px; position:relative;
 }
 #rail::after{
   content:''; position:absolute; inset:auto 0 0 0; height:64px;
   background:repeating-linear-gradient(to bottom,
     var(--pad) 0 4px, transparent 4px 9px);
-  opacity:.3; margin:0 9px;
+  opacity:.3; margin:0 9px; pointer-events:none;
 }
 .led{
   width:9px;height:9px;border-radius:50%;margin:5px 0;
@@ -317,16 +317,19 @@ button,input,select,textarea{font:inherit;color:inherit}
 #board .bname{text-align:center;margin-bottom:7px}
 #pins{display:grid;grid-template-columns:1fr auto 1fr;gap:0 8px;
   align-items:start}
-#pins .col{display:flex;flex-direction:column;gap:1px}
+#pins .col{display:flex;flex-direction:column;gap:1px;min-width:0}
 #pins .spine{width:26px;background:repeating-linear-gradient(to bottom,
   var(--trace) 0 1px,transparent 1px 6px);border-radius:2px;
   align-self:stretch;margin:2px 0;opacity:.5}
 .pin{
   display:flex;align-items:center;gap:5px;padding:1px 5px;cursor:default;
   font-family:var(--mono);font-size:10.5px;color:var(--muted);
-  border-radius:2px;
+  border-radius:2px;min-width:0;
 }
 #pins .col.right .pin{flex-direction:row-reverse}
+.pin .n{flex:none}
+.pin .tags{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pins .col.right .pin .tags{text-align:right}
 .pin:hover{background:#17272120}
 .pin .pad{width:9px;height:9px;border:1.5px solid var(--pad);border-radius:2px;
   flex:none;background:#15171a;
@@ -613,7 +616,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
   <!-- top bar -->
   <div id="top">
-    <div id="brand"><b>ESP32</b><span>studio</span></div>
+    <div id="brand"><b>FORGE32</b><span>ide</span></div>
     <div class="vr"></div>
     <select class="pick" id="sel-board" title="Target board"></select>
     <select class="pick" id="sel-port" title="Serial port"></select>
@@ -1898,7 +1901,7 @@ function tokenize(line, inBlock) {
 const St = {
   sketch: null, files: {}, active: '', dirty: new Set(),
   diags: [], marksOn: true, ghostOn: true, acAuto: true,
-  ghostText: '', ghostAt: -1, snipStops: [], snipEnd: -1,
+  ghostText: '', ghostAt: -1, ghostConsume: 0, snipStops: [], snipEnd: -1,
   findMatches: [], findIdx: 0, blockState: [],
 };
 
@@ -2394,7 +2397,7 @@ function scheduleGhost() {
   ghostTimer = setTimeout(computeGhost, 90);
 }
 
-function clearGhost() { ghost.innerHTML = ''; St.ghostText = ''; St.ghostAt = -1; }
+function clearGhost() { ghost.innerHTML = ''; St.ghostText = ''; St.ghostAt = -1; St.ghostConsume = 0; }
 
 const PATTERNS = [
   [/void\s+setup\s*\(\s*\)\s*\{\s*$/, 'Serial.begin(115200);'],
@@ -2406,6 +2409,11 @@ const PATTERNS = [
   [/^\s*#include\s*<A$/, 'rduino.h>'],
   [/pinMode\($/, 'LED, OUTPUT);'],
   [/digitalWrite\($/, 'LED, HIGH);'],
+  [/delay\($/, '1000);'],
+  [/delayMicroseconds\($/, '1000);'],
+  [/analogWrite\($/, 'LED, 128);'],
+  [/ledcWrite\($/, 'pin, 128);'],
+  [/analogRead\($/, '34);'],
   [/^\s*Serial\.print$/, 'ln();'],
   [/^\s*millis\(\)\s*-\s*$/, 'lastRun >= INTERVAL) {'],
   [/xTaskCreatePinnedToCore\($/, 'taskFn, "task", 4096, nullptr, 1, nullptr, 0);'],
@@ -2422,7 +2430,13 @@ function computeGhost() {
   const src = ta.value;
   const lineStart = src.lastIndexOf('\n', pos - 1) + 1;
   const lineEnd = src.indexOf('\n', pos);
-  const rest = src.slice(pos, lineEnd === -1 ? src.length : lineEnd);
+  const restFull = src.slice(pos, lineEnd === -1 ? src.length : lineEnd);
+  // typing "(" auto-closes it, leaving the cursor just before its ")".
+  // Look past that noise so "delay(" still offers "1000);" instead of
+  // going quiet the moment there is a matching closer sitting right there.
+  const closerRun = /^[)\]}]+/.exec(restFull);
+  const restNoise = closerRun ? closerRun[0].length : 0;
+  const rest = restFull.slice(restNoise);
   if (rest.trim()) return;                        // only predict at end of a line
   const before = src.slice(lineStart, pos);
   if (!before.trim() && before.length < 2) return;
@@ -2484,11 +2498,11 @@ function computeGhost() {
   }
   if (!g || g.length < 2 || g.length > 120) return;
   if (aiPending) return;
-  paintGhost(before, g, pos);
+  paintGhost(before, g, pos, restNoise);
 }
 
-function paintGhost(before, g, pos) {
-  St.ghostText = g; St.ghostAt = pos;
+function paintGhost(before, g, pos, consume) {
+  St.ghostText = g; St.ghostAt = pos; St.ghostConsume = consume || 0;
   const p = posToLC(pos);
   ghost.innerHTML = '<div style="position:absolute;left:' +
     (padL + p.col * charW) + 'px;top:' + (padT + p.line * lineH) +
@@ -2502,8 +2516,13 @@ function acceptGhost(oneWord) {
     const m = /^\W*\w+|^\W+/.exec(take);
     take = m ? m[0] : take;
   }
+  // the ghost text already supplies its own closing punctuation, so if the
+  // editor auto-closed a bracket right at this spot, swallow just as many
+  // of those now-redundant closers as the accepted text itself closes.
+  const consume = oneWord ? 0 : Math.min(St.ghostConsume || 0,
+    (take.match(/[)\]}]/g) || []).length);
   clearGhost();
-  insert(take);
+  insert(take, ta.selectionStart, ta.selectionStart + consume);
   return true;
 }
 
@@ -2559,7 +2578,7 @@ async function aiGhost() {
 }
 
 function paintGhostMulti(g, pos) {
-  St.ghostText = g; St.ghostAt = pos;
+  St.ghostText = g; St.ghostAt = pos; St.ghostConsume = 0;
   const p = posToLC(pos);
   const rows = g.split('\n');
   ghost.innerHTML = rows.map((r, i) => '<div style="position:absolute;left:' +
@@ -2867,9 +2886,69 @@ function modal(title, html, footer) {
   $('#modal').classList.add('on');
   $('#mfoot').querySelectorAll('[data-close]').forEach(b => b.onclick = closeModal);
 }
-function closeModal() { $('#modal').classList.remove('on'); }
+// A modal opened via promptModal/confirmModal registers here so any way of
+// dismissing it -- the X, the backdrop, Escape, a data-close button -- also
+// resolves its promise as a cancel, instead of leaving the caller hanging.
+let onModalCancel = null;
+function closeModal() {
+  $('#modal').classList.remove('on');
+  const cb = onModalCancel; onModalCancel = null;
+  if (cb) cb();
+}
 $('#mclose').onclick = closeModal;
 $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('#modal').classList.contains('on')) closeModal();
+});
+
+/* Themed stand-ins for window.prompt/confirm, so creating or deleting a
+   sketch does not drop the user into a native browser dialog that clashes
+   with the rest of the app's look. Both resolve like their native namesakes:
+   promptModal resolves the string or null, confirmModal resolves a bool. */
+function promptModal(title, label, placeholder, validate) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (val) => {
+      if (settled) return;
+      settled = true; onModalCancel = null;
+      closeModal(); resolve(val);
+    };
+    onModalCancel = () => finish(null);
+    modal(title,
+      '<div class="fields"><div class="field"><label class="silk">' + esc(label) +
+      '</label><input id="mp-input" type="text" placeholder="' + esc(placeholder || '') +
+      '" autocomplete="off" spellcheck="false"></div>' +
+      '<div class="hint" id="mp-err" style="padding-left:0;color:var(--hot);display:none"></div></div>',
+      '<button class="btn" data-close>Cancel</button>' +
+      '<button class="btn go" id="mp-ok">OK</button>');
+    const input = $('#mp-input');
+    const err = $('#mp-err');
+    const submit = () => {
+      const v = input.value.trim();
+      const problem = validate ? validate(v) : (v ? null : 'Required.');
+      if (problem) { err.textContent = problem; err.style.display = 'block'; return; }
+      finish(v);
+    };
+    $('#mp-ok').onclick = submit;
+    input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } };
+    setTimeout(() => input.focus(), 30);
+  });
+}
+function confirmModal(title, message, okLabel) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (val) => {
+      if (settled) return;
+      settled = true; onModalCancel = null;
+      closeModal(); resolve(val);
+    };
+    onModalCancel = () => finish(false);
+    modal(title, '<p>' + esc(message) + '</p>',
+      '<button class="btn" data-close>Cancel</button>' +
+      '<button class="btn danger" id="mc-ok">' + esc(okLabel || 'Delete') + '</button>');
+    $('#mc-ok').onclick = () => finish(true);
+  });
+}
 
 function logOut(text, cls) {
   const el = $('#outlog');
@@ -3303,10 +3382,11 @@ async function openSketch(name) {
 }
 
 async function newSketch() {
-  const name = prompt('Name for the new sketch (letters, numbers, underscore)');
+  const name = await promptModal('New sketch', 'Name', 'blink_led', (v) =>
+    !v ? 'Required.' :
+    !/^[A-Za-z0-9_][A-Za-z0-9_-]*$/.test(v) ? 'Use letters, numbers, underscore or dash.' :
+    null);
   if (!name) return;
-  if (!/^[A-Za-z0-9_][A-Za-z0-9_-]*$/.test(name))
-    return toast('Use letters, numbers, underscore or dash', 'bad');
   try {
     await api('/api/sketch/new', { name });
     await openSketch(name);
@@ -3315,20 +3395,23 @@ async function newSketch() {
 }
 
 async function deleteSketch(name) {
-  if (!confirm('Delete the sketch ' + name + '? This cannot be undone.')) return;
+  const ok = await confirmModal('Delete sketch', 'Delete the sketch "' + name +
+    '"? This cannot be undone.', 'Delete');
+  if (!ok) return;
   await api('/api/sketch/delete', { name });
   if (St.sketch === name) { St.sketch = null; St.files = {}; ta.value = ''; render(); }
   loadSketchList();
   toast('Deleted ' + name);
 }
 
-function newFile() {
+async function newFile() {
   if (!St.sketch) return toast('Open a sketch first', 'bad');
-  const name = prompt('New file name, for example helper.h');
+  const name = await promptModal('New file', 'File name', 'helper.h', (v) =>
+    !v ? 'Required.' :
+    !/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(ino|h|hpp|c|cpp)$/.test(v) ? 'Use an .ino, .h, .hpp, .c or .cpp name.' :
+    St.files[v] ? 'A file with that name already exists.' :
+    null);
   if (!name) return;
-  if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(ino|h|hpp|c|cpp)$/.test(name))
-    return toast('Use an .ino, .h, .hpp, .c or .cpp name', 'bad');
-  const guard = name.replace(/\W/g, '_').toUpperCase();
   St.files[name] = /\.(h|hpp)$/.test(name)
     ? '#pragma once\n#include <Arduino.h>\n\n' : '#include <Arduino.h>\n\n';
   St.dirty.add(name);
@@ -3711,10 +3794,10 @@ function drawPins() {
   $('#boardname').textContent = PINS.name + '  \u00b7  by gpio number';
   const half = Math.ceil(PINS.pins.length / 2);
   const col = (arr, side) => '<div class="col ' + side + '">' + arr.map(p =>
-    '<div class="pin' + (p.warn ? ' warn' : '') + '" data-p="' + p.n + '">' +
+    '<div class="pin' + (p.warn ? ' warn' : '') + '" data-p="' + p.n + '" title="' +
+    esc(p.tags.join(', ')) + '">' +
     '<span class="pad"></span><span class="n">GPIO' + p.n + '</span>' +
-    '<span style="color:var(--dim);font-size:9.5px;overflow:hidden;' +
-    'text-overflow:ellipsis;white-space:nowrap">' +
+    '<span class="tags" style="color:var(--dim);font-size:9.5px">' +
     esc(p.tags.filter(t => t !== 'PWM' && t !== 'RTC').slice(0, 2).join(' ')) +
     '</span></div>').join('') + '</div>';
   $('#pins').innerHTML = col(PINS.pins.slice(0, half), 'left') +
@@ -3945,7 +4028,7 @@ addEventListener('beforeunload', e => {
 /* ---------------- boot ---------------- */
 const DEMO = `#include <WiFi.h>
 
-// ESP32 Studio. Nothing here needs the internet: try typing and watch the
+// FORGE32. Nothing here needs the internet: try typing and watch the
 // grey text guess the rest, then press Tab to take it.
 //
 // Ctrl+R verifies, Ctrl+U uploads, Ctrl+M opens the serial monitor.
@@ -4005,7 +4088,7 @@ async function boot() {
     openFile('sketch.ino');
     loadSketchList();
   }
-  logOut('ESP32 Studio ready.' + (ONLINE ? '' :
+  logOut('FORGE32 ready.' + (ONLINE ? '' :
     ' Editor only, the backend did not answer.'), 'note');
   if (ONLINE && HEALTH.cliVersion)
     logOut('arduino-cli ' + HEALTH.cliVersion +
