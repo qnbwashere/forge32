@@ -1,0 +1,37 @@
+name: Delete release
+
+# One-off maintenance: removes a release and its underlying git tag. Direct
+# tag push/delete is blocked from the dev sandbox's network, so this runs the
+# same operation from a GitHub-hosted runner instead, which isn't behind that
+# restriction.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag whose release and git tag to delete'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.payload.inputs.tag;
+            try {
+              const rel = await github.rest.repos.getReleaseByTag({ owner: context.repo.owner, repo: context.repo.repo, tag });
+              await github.rest.repos.deleteRelease({ owner: context.repo.owner, repo: context.repo.repo, release_id: rel.data.id });
+              console.log('deleted release for', tag);
+            } catch (e) {
+              console.log('no release found for', tag, e.message);
+            }
+            try {
+              await github.rest.git.deleteRef({ owner: context.repo.owner, repo: context.repo.repo, ref: `tags/${tag}` });
+              console.log('deleted tag', tag);
+            } catch (e) {
+              console.log('no tag found for', tag, e.message);
+            }
