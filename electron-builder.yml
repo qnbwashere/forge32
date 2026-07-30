@@ -31,9 +31,13 @@ extraResources:
 # ---------------------------------------------------------------------------
 
 mac:
+  # No arch list here on purpose: the release workflow passes --arm64 or
+  # --x64 per job, and each job should build exactly the one dmg that
+  # matches. Listing both archs here made every job build both, back to
+  # back in the same process, which reliably broke dmgbuild's staging
+  # volume on the second dmg (same title, same background file path).
   target:
-    - target: dmg
-      arch: [arm64, x64]
+    - dmg
   artifactName: FORGE32-mac-${arch}.${ext}
   category: public.app-category.developer-tools
   darkModeSupport: true
