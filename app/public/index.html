@@ -102,42 +102,32 @@ button,input,select,textarea{font:inherit;color:inherit}
   color:var(--pad);text-transform:uppercase}
 .vr{width:1px;height:20px;background:var(--trace)}
 .pick{
-  background:var(--mask); border:1px solid var(--trace2); border-radius:3px;
-  padding:4px 7px; font-family:var(--mono); font-size:11px; max-width:200px;
-  cursor:pointer; text-overflow:ellipsis;
+  background:var(--mask); border:1px solid var(--trace2); border-radius:6px;
+  padding:5px 9px; font-family:var(--sans); font-size:12px; max-width:200px;
+  cursor:pointer; text-overflow:ellipsis; transition:border-color .12s;
 }
-.pick:hover{border-color:var(--pad)}
+.pick:hover{border-color:var(--muted)}
 .btn{
-  display:inline-flex;align-items:center;gap:6px;
-  background:linear-gradient(155deg,#1a2620 0%,var(--panel2) 55%,#0f1815 100%);
+  display:inline-flex;align-items:center;gap:7px;
+  background:var(--panel2);
   border:1px solid var(--trace2); color:var(--flux);
-  padding:5px 11px; border-radius:4px; cursor:pointer;
-  font-family:var(--cond); font-size:11px; font-weight:600;
-  letter-spacing:.09em; text-transform:uppercase; white-space:nowrap;
-  box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 -1px 0 rgba(0,0,0,.4) inset,
-    0 1px 2px rgba(0,0,0,.35);
-  transition:box-shadow .1s ease,transform .06s ease,background .12s,border-color .12s;
+  padding:6px 13px; border-radius:6px; cursor:pointer;
+  font-family:var(--sans); font-size:12.5px; font-weight:500;
+  letter-spacing:0; white-space:nowrap;
+  transition:background .12s ease,border-color .12s ease,transform .06s ease;
 }
-.btn:hover:not(:disabled){border-color:var(--pad);background:linear-gradient(155deg,#1f2e26 0%,#18251f 55%,#101b17 100%)}
-.btn:active:not(:disabled){transform:translateY(1px);
-  box-shadow:0 1px 2px rgba(0,0,0,.5) inset}
+.btn:hover:not(:disabled){border-color:var(--muted);background:#262a30}
+.btn:active:not(:disabled){transform:translateY(1px)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
-/* the one real switch in the toolbar: this fires the build/flash */
+/* the one real action button in the toolbar: this fires the build/flash */
 .btn.go{
-  background:radial-gradient(circle at 32% 26%,#fff6db 0%,#f6d488 16%,var(--gold) 55%,#a97a2a 100%);
-  border-color:#8a651f;color:#161206;
-  box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 -1.5px 2px rgba(0,0,0,.25) inset,
-    0 2px 4px rgba(0,0,0,.4),0 0 0 1px rgba(227,180,87,.25);
+  background:var(--gold);
+  border-color:var(--gold);color:#161206;font-weight:600;
 }
-.btn.go:hover:not(:disabled){
-  background:radial-gradient(circle at 32% 26%,#fffaf0 0%,#f8dc9e 16%,#e8bf6c 55%,#a97a2a 100%);
-}
-.btn.go:active:not(:disabled){
-  transform:translateY(1px);
-  box-shadow:0 1px 3px rgba(0,0,0,.4) inset,0 0 0 1px rgba(227,180,87,.25);
-}
+.btn.go:hover:not(:disabled){background:#edc274;border-color:#edc274}
+.btn.go:active:not(:disabled){transform:translateY(1px)}
 .btn.danger:hover:not(:disabled){border-color:var(--hot);color:var(--hot)}
-.btn kbd{font-family:var(--mono);font-size:9px;opacity:.55;font-weight:400;
+.btn kbd{font-family:var(--mono);font-size:10px;opacity:.5;font-weight:400;
   letter-spacing:0}
 #top .grow{flex:1}
 
@@ -161,8 +151,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .sect .add:hover{color:var(--gold)}
 .body{padding:0 6px 8px}
 .row{
-  display:flex;align-items:center;gap:7px;padding:4px 7px;border-radius:3px;
-  cursor:pointer;font-family:var(--mono);font-size:11.5px;color:var(--muted);
+  display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
+  cursor:pointer;font-family:var(--sans);font-size:12px;color:var(--muted);
   border:1px solid transparent;
 }
 .row:hover{background:var(--panel2);color:var(--flux)}
@@ -375,33 +365,34 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 .search input{
   flex:1;background:var(--mask);border:1px solid var(--trace2);
-  border-radius:3px;padding:5px 8px;font-family:var(--mono);font-size:11.5px;
+  border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:11.5px;
 }
 .search input:focus{outline:none;border-color:var(--pad)}
 .card{
-  border:1px solid var(--trace);border-radius:4px;padding:8px 9px;
-  margin-bottom:6px;background:#17191c;
+  border:1px solid var(--trace);border-radius:8px;padding:10px 11px;
+  margin-bottom:7px;background:#17191c;transition:border-color .12s;
 }
-.card h5{margin:0 0 3px;font-family:var(--mono);font-size:12px;
+.card:hover{border-color:var(--trace2)}
+.card h5{margin:0 0 4px;font-family:var(--sans);font-size:12.5px;
   color:var(--flux);font-weight:600;display:flex;gap:6px;align-items:baseline}
-.card h5 .v{font-size:10px;color:var(--pad)}
-.card p{margin:0;font-size:11px;color:var(--muted);line-height:1.45}
-.card .foot{display:flex;align-items:center;gap:6px;margin-top:7px}
-.card .foot .who{flex:1;font-size:10px;color:var(--dim);overflow:hidden;
+.card h5 .v{font-size:10.5px;color:var(--pad);font-weight:500}
+.card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.5}
+.card .foot{display:flex;align-items:center;gap:6px;margin-top:8px}
+.card .foot .who{flex:1;font-size:10.5px;color:var(--dim);overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .mini{
-  background:var(--panel2);border:1px solid var(--trace2);border-radius:3px;
-  padding:3px 8px;cursor:pointer;font-family:var(--cond);font-size:10px;
-  font-weight:600;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--muted);
+  background:var(--panel2);border:1px solid var(--trace2);border-radius:6px;
+  padding:4px 10px;cursor:pointer;font-family:var(--sans);font-size:11px;
+  font-weight:500;letter-spacing:0;text-transform:none;
+  color:var(--muted);transition:border-color .12s,color .12s;
 }
 .mini:hover{border-color:var(--pad);color:var(--gold)}
 .mini.on{background:var(--gold);border-color:var(--gold);color:#161206}
 .mini:disabled{opacity:.45;cursor:default}
-.snipgrid{display:flex;flex-direction:column;gap:4px}
+.snipgrid{display:flex;flex-direction:column;gap:5px}
 .snip{
-  border:1px solid var(--trace);border-radius:4px;padding:7px 9px;
-  cursor:pointer;background:#17191c;
+  border:1px solid var(--trace);border-radius:8px;padding:8px 10px;
+  cursor:pointer;background:#17191c;transition:border-color .12s;
 }
 .snip:hover{border-color:var(--pad)}
 .snip b{display:block;font-family:var(--mono);font-size:11.5px;
@@ -411,7 +402,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .field label{display:block;margin-bottom:3px}
 .field select,.field input{
   width:100%;background:var(--mask);border:1px solid var(--trace2);
-  border-radius:3px;padding:5px 7px;font-family:var(--mono);font-size:11.5px;
+  border-radius:6px;padding:5px 7px;font-family:var(--mono);font-size:11.5px;
 }
 
 /* ---------- console ---------- */
@@ -453,10 +444,10 @@ button,input,select,textarea{font:inherit;color:inherit}
   flex:none;align-items:center}
 #serbar input[type=text]{
   flex:1;background:var(--mask);border:1px solid var(--trace2);
-  border-radius:3px;padding:5px 8px;font-family:var(--mono);font-size:11.5px;
+  border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:11.5px;
 }
 #serbar select{background:var(--mask);border:1px solid var(--trace2);
-  border-radius:3px;padding:4px 5px;font-family:var(--mono);font-size:11px}
+  border-radius:6px;padding:4px 5px;font-family:var(--mono);font-size:11px}
 .chk{display:flex;align-items:center;gap:4px;font-size:10.5px;
   color:var(--muted);cursor:pointer;white-space:nowrap}
 .chk input{accent-color:var(--gold);margin:0}
@@ -561,7 +552,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 #find.on{display:flex}
 #find input{background:var(--mask);border:1px solid var(--trace2);
-  border-radius:3px;padding:3px 7px;font-family:var(--mono);font-size:11.5px;
+  border-radius:6px;padding:3px 7px;font-family:var(--mono);font-size:11.5px;
   width:150px}
 #find .n{font-family:var(--mono);font-size:10.5px;color:var(--dim);
   min-width:44px;text-align:center}
