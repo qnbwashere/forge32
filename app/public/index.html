@@ -14,25 +14,26 @@
    epoxy, the accents are ENIG gold, the labels are silkscreen.
    ------------------------------------------------------------------ */
 :root{
+  --bg:#0a0b0c;
   --mask:#15171a; --panel:#1b1d21; --panel2:#212429; --trace:#2c2f34;
-  --trace2:#3a3e44; --gold:#E3B457; --pad:#B98A2E; --flux:#E6EFE9;
+  --trace2:#3a3e44; --gold:#C7E36E; --pad:#87B043; --flux:#E6EFE9;
   --muted:#8b939a; --dim:#5c6570;
   --hot:#E4563C; --ok:#46C98B; --wire:#62B6D8; --violet:#B18AD6;
   --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
   --cond:'IBM Plex Sans Condensed','Roboto Condensed',system-ui,sans-serif;
   --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
   --code:13px; --lh:1.55;
-  --rail:34px; --side:212px; --insp:290px;
+  --side:220px; --insp:290px; --gap:14px; --radius:16px;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{
-  background:var(--mask); color:var(--flux); font-family:var(--sans);
+  background:var(--bg); color:var(--flux); font-family:var(--sans);
   font-size:13px; overflow:hidden;
   -webkit-font-smoothing:antialiased;
 }
 button,input,select,textarea{font:inherit;color:inherit}
-::selection{background:rgba(227,180,87,.28)}
+::selection{background:rgba(199,227,110,.28)}
 :focus-visible{outline:2px solid var(--gold);outline-offset:1px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
@@ -42,103 +43,143 @@ button,input,select,textarea{font:inherit;color:inherit}
   letter-spacing:.15em; text-transform:uppercase; color:var(--dim);
 }
 
-/* ---------- shell ---------- */
+/* ---------- shell: two floating cards on a near black bezel ---------- */
 #app{
-  display:grid; height:100%;
-  grid-template-columns:var(--rail) var(--side) minmax(0,1fr) var(--insp);
-  grid-template-rows:42px minmax(0,1fr) 22px;
-  grid-template-areas:
-    "rail top   top   top"
-    "rail side  main  insp"
-    "rail status status status";
+  display:flex; align-items:stretch; height:100%; gap:var(--gap);
+  padding:var(--gap); background:var(--bg);
 }
+#side{
+  flex:none; width:var(--side); border-radius:var(--radius);
+  border:1px solid var(--trace2); overflow:hidden;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+}
+#workspace{
+  flex:1; min-width:0; display:flex; flex-direction:column;
+  border-radius:var(--radius); border:1px solid var(--trace2); overflow:hidden;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+}
+#body-row{flex:1; min-height:0; display:flex}
 
-/* ---------- edge connector rail (signature) ---------- */
-#rail{
-  grid-area:rail; background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);
-  border-right:1px solid var(--trace);
-  display:flex; flex-direction:column; align-items:center; gap:2px;
-  padding:7px 0 72px; position:relative;
+/* ---------- sidebar header: wordmark + link/activity dots ---------- */
+#sidehead{
+  display:flex; align-items:center; gap:8px; padding:16px 14px 12px;
+  flex:none;
 }
-#rail::after{
-  content:''; position:absolute; inset:auto 0 0 0; height:64px;
-  background:repeating-linear-gradient(to bottom,
-    var(--pad) 0 4px, transparent 4px 9px);
-  opacity:.3; margin:0 9px; pointer-events:none;
+#sidehead b{
+  font-family:var(--cond); font-weight:700; font-size:17px;
+  letter-spacing:.03em; color:var(--flux);
 }
+#sidehead .grow{flex:1}
+#ledrow{display:flex; align-items:center; gap:5px}
 .led{
-  width:9px;height:9px;border-radius:50%;margin:5px 0;
+  width:8px;height:8px;border-radius:50%;
   background:radial-gradient(circle at 32% 28%,#24272b 0%,#15171a 70%);
   box-shadow:inset 0 1px 1.5px rgba(0,0,0,.7),inset 0 -0.5px 0 rgba(255,255,255,.03),
     0 0.5px 0 rgba(255,255,255,.04);
   transition:background .12s, box-shadow .12s;
 }
-.led.on{background:radial-gradient(circle at 32% 28%,#fff6db 0%,var(--gold) 55%,#8a651f 100%);
-  box-shadow:inset 0.5px 0.5px 1px rgba(255,255,255,.8),0 0 7px 1.5px rgba(227,180,87,.75)}
+.led.on{background:radial-gradient(circle at 32% 28%,#f5ffe0 0%,var(--gold) 55%,#5c7a2e 100%);
+  box-shadow:inset 0.5px 0.5px 1px rgba(255,255,255,.8),0 0 7px 1.5px rgba(199,227,110,.75)}
 .led.ok{background:radial-gradient(circle at 32% 28%,#d9ffe9 0%,var(--ok) 55%,#1f6b46 100%);
   box-shadow:inset 0.5px 0.5px 1px rgba(255,255,255,.8),0 0 7px 1.5px rgba(70,201,139,.65)}
 .led.bad{background:radial-gradient(circle at 32% 28%,#ffd9d0 0%,var(--hot) 55%,#8a2a18 100%);
   box-shadow:inset 0.5px 0.5px 1px rgba(255,255,255,.8),0 0 7px 1.5px rgba(228,86,60,.65)}
-.railtag{font-family:var(--cond);font-size:8px;letter-spacing:.1em;
-  color:var(--dim);text-transform:uppercase;margin-bottom:9px}
-#rail .spacer{flex:1}
-.railbtn{
-  background:none;border:1px solid transparent;color:var(--dim);
-  width:24px;height:24px;border-radius:3px;cursor:pointer;font-size:13px;
-  display:grid;place-items:center;padding:0
-}
-.railbtn:hover{color:var(--gold);border-color:var(--trace2)}
 
-/* ---------- top bar ---------- */
-#top{
-  grid-area:top; background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);
-  border-bottom:1px solid var(--trace);
-  display:flex; align-items:center; gap:10px; padding:0 10px 0 12px;
+/* ---------- decorative setup/help dials at the foot of the sidebar ---------- */
+.dials{display:flex; flex-direction:column; align-items:center; gap:4px;
+  padding:10px 0 16px; flex:none}
+.dial-label{margin-top:2px}
+.dial-label:last-child{margin-bottom:2px}
+.knob{
+  border:none; padding:0; cursor:pointer; border-radius:50%; position:relative;
+  background:radial-gradient(circle at 34% 28%,#3a3d42 0%,#202225 55%,#131416 100%);
+  box-shadow:0 6px 14px rgba(0,0,0,.5), inset 0 1px 1px rgba(255,255,255,.08),
+    inset 0 -2px 3px rgba(0,0,0,.6);
 }
-#brand{display:flex;align-items:baseline;gap:7px;margin-right:4px}
-#brand b{font-family:var(--cond);font-weight:700;font-size:15px;
-  letter-spacing:.05em;color:var(--flux)}
-#brand span{font-family:var(--cond);font-size:9px;letter-spacing:.18em;
-  color:var(--pad);text-transform:uppercase}
+.knob.big{width:96px;height:96px;margin:6px 0 2px}
+.knob.small{width:34px;height:34px;margin:2px 0}
+.knob::before{
+  content:''; position:absolute; inset:-5px; border-radius:50%;
+  border:3px solid var(--trace); border-top-color:var(--gold);
+  transform:rotate(-125deg); opacity:.9;
+}
+.knob.small::before{display:none}
+.knob:hover{filter:brightness(1.12)}
+.knobface{
+  position:absolute; inset:8px; border-radius:50%;
+  background:radial-gradient(circle at 38% 30%,#4b4e54 0%,#26282c 60%,#151618 100%);
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.12), inset 0 -3px 5px rgba(0,0,0,.55);
+}
+.knob.small .knobface{inset:5px}
+.knobmark{
+  position:absolute; left:50%; top:12%; width:2px; height:26%;
+  background:linear-gradient(rgba(255,255,255,.5),rgba(0,0,0,.4));
+  transform:translateX(-50%) rotate(35deg); transform-origin:50% 190%;
+  border-radius:1px;
+}
+.knob.small .knobmark{top:16%;height:30%}
+
+/* ---------- top bar: rounded pill controls ---------- */
+#top{
+  flex:none; background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);
+  border-bottom:1px solid var(--trace);
+  display:flex; align-items:center; gap:8px; padding:10px 14px;
+  overflow-x:auto; scrollbar-width:none;
+}
+#top::-webkit-scrollbar{display:none}
 .vr{width:1px;height:20px;background:var(--trace)}
+.pickwrap{position:relative;display:inline-flex;align-items:center}
+.picon{position:absolute;left:11px;color:var(--dim);pointer-events:none;
+  display:flex;font-size:13px}
+.chev{
+  position:absolute;right:10px;color:var(--dim);pointer-events:none;
+  font-size:9px;font-style:normal;
+}
 .pick{
-  background:var(--mask); border:1px solid var(--trace2); border-radius:6px;
-  padding:5px 9px; font-family:var(--sans); font-size:12px; max-width:200px;
+  appearance:none;-webkit-appearance:none;
+  background:var(--panel2); border:1px solid var(--trace2); border-radius:999px;
+  padding:8px 26px 8px 13px; font-family:var(--sans); font-size:12.5px; max-width:200px;
   cursor:pointer; text-overflow:ellipsis; transition:border-color .12s;
 }
+.pickwrap:has(.picon) .pick{padding-left:30px}
 .pick:hover{border-color:var(--muted)}
 .btn{
-  display:inline-flex;align-items:center;gap:7px;
+  display:inline-flex;align-items:center;gap:6px;position:relative;
   background:var(--panel2);
   border:1px solid var(--trace2); color:var(--flux);
-  padding:6px 13px; border-radius:6px; cursor:pointer;
+  padding:8px 24px 8px 15px; border-radius:999px; cursor:pointer;
   font-family:var(--sans); font-size:12.5px; font-weight:500;
   letter-spacing:0; white-space:nowrap;
   transition:background .12s ease,border-color .12s ease,transform .06s ease;
 }
+.btn .chev{position:absolute;right:11px}
 .btn:hover:not(:disabled){border-color:var(--muted);background:#262a30}
 .btn:active:not(:disabled){transform:translateY(1px)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 /* the one real action button in the toolbar: this fires the build/flash */
 .btn.go{
   background:var(--gold);
-  border-color:var(--gold);color:#161206;font-weight:600;
+  border-color:var(--gold);color:#1b2a0c;font-weight:600;
+  box-shadow:0 0 0 4px rgba(199,227,110,.12);
 }
-.btn.go:hover:not(:disabled){background:#edc274;border-color:#edc274}
+.btn.go .chev{color:#1b2a0c;opacity:.6}
+.btn.go:hover:not(:disabled){background:#d6ee8e;border-color:#d6ee8e}
 .btn.go:active:not(:disabled){transform:translateY(1px)}
 .btn.danger:hover:not(:disabled){border-color:var(--hot);color:var(--hot)}
-.btn kbd{font-family:var(--mono);font-size:10px;opacity:.5;font-weight:400;
-  letter-spacing:0}
 #top .grow{flex:1}
 
 /* ---------- sidebar ---------- */
 #side{
-  grid-area:side; background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%); border-right:1px solid var(--trace);
+  background:linear-gradient(165deg,#212327 0%,#1a1c20 45%,#141517 100%);
   overflow-y:auto; display:flex; flex-direction:column;
 }
-.sect{border-bottom:1px solid var(--trace)}
+#side .stack{display:flex;flex-direction:column;gap:10px;padding:0 10px;flex:1;min-height:0}
+.sect{
+  border-radius:11px; background:rgba(255,255,255,.02);
+  border:1px solid var(--trace); flex:none;
+}
 .sect>header{
-  display:flex;align-items:center;gap:6px;padding:8px 10px 6px;
+  display:flex;align-items:center;gap:6px;padding:9px 11px 5px;
   cursor:pointer;user-select:none;
 }
 .sect>header:hover .silk{color:var(--muted)}
@@ -149,26 +190,26 @@ button,input,select,textarea{font:inherit;color:inherit}
 .sect .add{background:none;border:none;color:var(--dim);cursor:pointer;
   font-size:14px;line-height:1;padding:0 2px}
 .sect .add:hover{color:var(--gold)}
-.body{padding:0 6px 8px}
+.body{padding:2px 7px 8px}
 .row{
-  display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
+  display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;
   cursor:pointer;font-family:var(--sans);font-size:12px;color:var(--muted);
   border:1px solid transparent;
 }
-.row:hover{background:var(--panel2);color:var(--flux)}
-.row.sel{background:#23262b;color:var(--gold);border-color:var(--trace2)}
+.row:hover{background:rgba(255,255,255,.045);color:var(--flux)}
+.row.sel{background:rgba(255,255,255,.07);color:var(--flux);border-color:var(--trace2)}
 .row .dot{width:5px;height:5px;border-radius:50%;background:var(--trace2);
   flex:none}
 .row.sel .dot{background:var(--gold)}
 .row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row .kill{opacity:0;background:none;border:none;color:var(--dim);
-  cursor:pointer;font-size:12px;padding:0}
+.row .kill{opacity:.55;background:none;border:none;color:var(--dim);
+  cursor:pointer;font-size:12px;padding:0;letter-spacing:1px}
 .row:hover .kill{opacity:1}
 .row .kill:hover{color:var(--hot)}
 .hint{padding:6px 8px;color:var(--dim);font-size:11px;line-height:1.5}
 
 /* ---------- main ---------- */
-#main{grid-area:main;display:flex;flex-direction:column;min-width:0;
+#main{flex:1;display:flex;flex-direction:column;min-width:0;
   background:var(--mask)}
 #tabs{
   display:flex;align-items:stretch;background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);
@@ -293,7 +334,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- inspector ---------- */
 #insp{
-  grid-area:insp;background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);border-left:1px solid var(--trace);
+  flex:none;width:var(--insp);
+  background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);border-left:1px solid var(--trace);
   display:flex;flex-direction:column;min-width:0;
 }
 #insptabs{display:flex;border-bottom:1px solid var(--trace);flex:none}
@@ -477,9 +519,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- status ---------- */
 #status{
-  grid-area:status;background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);border-top:1px solid var(--trace);
+  flex:none;background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);border-top:1px solid var(--trace);
   display:flex;align-items:center;gap:0;font-family:var(--mono);font-size:10.5px;
-  color:var(--muted);padding:0;overflow:hidden;
+  color:var(--muted);padding:0;overflow:hidden;height:30px;
 }
 #status .cell{padding:0 10px;border-right:1px solid var(--trace);
   height:100%;display:flex;align-items:center;gap:6px;white-space:nowrap}
@@ -570,26 +612,25 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* ---------- narrow screens ---------- */
 #mobbar{display:none}
 @media (max-width:1080px){
-  :root{--insp:0px}
+  :root{--insp:0px; --gap:8px}
   #insp{position:fixed;top:0;right:0;bottom:0;width:290px;z-index:60;
     transform:translateX(100%);transition:transform .18s;
-    border-left:1px solid var(--trace2);box-shadow:-14px 0 34px rgba(0,0,0,.5)}
+    border-left:1px solid var(--trace2);box-shadow:-14px 0 34px rgba(0,0,0,.5);
+    border-radius:0}
   #insp.open{transform:none}
-  #app{grid-template-columns:var(--rail) var(--side) minmax(0,1fr);
-    grid-template-areas:"rail top top" "rail side main" "rail status status"}
 }
 @media (max-width:760px){
-  :root{--side:0px;--rail:30px}
-  #side{position:fixed;top:0;bottom:0;left:var(--rail);width:212px;z-index:60;
+  :root{--side:0px}
+  #side{position:fixed;top:0;bottom:0;left:0;width:212px;z-index:60;
     transform:translateX(-110%);transition:transform .18s;
-    box-shadow:14px 0 34px rgba(0,0,0,.5)}
+    box-shadow:14px 0 34px rgba(0,0,0,.5);border-radius:0}
   #side.open{transform:none}
-  #app{grid-template-columns:var(--rail) minmax(0,1fr);
-    grid-template-areas:"rail top" "rail main" "rail status"}
-  #brand span{display:none}
-  .btn kbd{display:none}
   #mobbar{display:flex;gap:4px}
-  #top{gap:6px;padding:0 6px 0 8px}
+  #top{gap:5px;padding:8px}
+  .btn{padding:7px 12px}
+  .btn .chev,.pickwrap .chev{display:none}
+  .pick{padding:7px 10px;max-width:120px}
+  .pickwrap:has(.picon) .pick{padding-left:26px}
   #console{height:170px}
 }
 @media (prefers-reduced-motion:reduce){
@@ -600,60 +641,89 @@ button,input,select,textarea{font:inherit;color:inherit}
 <body>
 <div id="app">
 
-  <!-- edge connector rail: live status LEDs -->
-  <div id="rail" title="board link status">
-    <div class="railtag">IO</div>
-    <div class="led" id="led-link" title="backend link"></div>
-    <div class="led" id="led-build" title="build"></div>
-    <div class="led" id="led-flash" title="flash"></div>
-    <div class="led" id="led-rx" title="serial receive"></div>
-    <div class="led" id="led-tx" title="serial send"></div>
-    <div class="spacer"></div>
-    <button class="railbtn" id="mob-side" title="Files">&#9776;</button>
-    <button class="railbtn" id="btn-setup" title="Setup and toolchain">&#9881;</button>
-    <button class="railbtn" id="btn-help" title="Keyboard shortcuts">?</button>
+  <!-- sidebar: its own floating card -->
+  <div id="side">
+    <div id="sidehead">
+      <b>FORGE32</b>
+      <div class="grow"></div>
+      <div id="ledrow">
+        <div class="led" id="led-link" title="backend link"></div>
+        <div class="led" id="led-build" title="build"></div>
+        <div class="led" id="led-flash" title="flash"></div>
+        <div class="led" id="led-rx" title="serial receive"></div>
+        <div class="led" id="led-tx" title="serial send"></div>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="sect" id="s-sketches">
+        <header><span class="caret">&#9662;</span><span class="silk">Sketches</span>
+          <span class="grow"></span>
+          <button class="add" id="btn-newsketch" title="New sketch">+</button>
+        </header>
+        <div class="body" id="sketchlist"></div>
+      </div>
+      <div class="sect" id="s-files">
+        <header><span class="caret">&#9662;</span><span class="silk">Files</span>
+          <span class="grow"></span>
+          <button class="add" id="btn-newfile" title="Add file to sketch">+</button>
+        </header>
+        <div class="body" id="filelist"></div>
+      </div>
+      <div class="sect" id="s-out">
+        <header><span class="caret">&#9662;</span><span class="silk">Outline</span></header>
+        <div class="body" id="outline"></div>
+      </div>
+    </div>
+    <div class="grow"></div>
+    <div class="dials">
+      <button class="knob big" id="btn-setup" title="Setup and toolchain">
+        <span class="knobface"><span class="knobmark"></span></span>
+      </button>
+      <span class="silk dial-label">Setup</span>
+      <button class="knob small" id="btn-help" title="Keyboard shortcuts">
+        <span class="knobface"><span class="knobmark"></span></span>
+      </button>
+      <span class="silk dial-label">Help</span>
+    </div>
   </div>
 
+  <!-- workspace: a second floating card holding the top bar, editor, inspector and status strip -->
+  <div id="workspace">
   <!-- top bar -->
   <div id="top">
-    <div id="brand"><b>FORGE32</b><span>ide</span></div>
-    <div class="vr"></div>
-    <select class="pick" id="sel-board" title="Target board"></select>
-    <select class="pick" id="sel-port" title="Serial port"></select>
+    <div class="pickwrap">
+      <i class="picon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="6" y="6" width="12" height="12" rx="1"/>
+        <path d="M9 2v3M12 2v3M15 2v3M9 19v3M12 19v3M15 19v3M2 9h3M2 12h3M2 15h3M19 9h3M19 12h3M19 15h3"/>
+      </svg></i>
+      <select class="pick" id="sel-board" title="Target board"></select>
+      <i class="chev">&#9662;</i>
+    </div>
+    <div class="pickwrap">
+      <select class="pick" id="sel-port" title="Serial port"></select>
+      <i class="chev">&#9662;</i>
+    </div>
     <button class="mini" id="btn-rescan" title="Rescan ports">&#8635;</button>
     <div class="vr"></div>
-    <button class="btn" id="btn-verify">Verify <kbd>^R</kbd></button>
-    <button class="btn go" id="btn-upload">Upload <kbd>^U</kbd></button>
-    <button class="btn" id="btn-monitor">Monitor <kbd>^M</kbd></button>
+    <button class="btn" id="btn-verify" title="Verify (Ctrl+R)">Verify<i class="chev">&#9662;</i></button>
+    <button class="btn go" id="btn-upload" title="Upload (Ctrl+U)">Upload &#8593;<i class="chev">&#9662;</i></button>
+    <button class="btn" id="btn-monitor" title="Monitor (Ctrl+M)">Monitor<i class="chev">&#9662;</i></button>
     <div class="grow"></div>
     <div id="mobbar">
+      <button class="mini" id="mob-side" title="Files">&#9776;</button>
       <button class="mini" id="mob-insp">Panel</button>
     </div>
-    <button class="btn" id="btn-save" title="Save sketch">Save <kbd>^S</kbd></button>
+    <button class="btn" id="btn-save" title="Save sketch (Ctrl+S)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+        <path d="M8 3v6h8V3"/><path d="M8 21v-8h8v8"/>
+      </svg>
+      Save<i class="chev">&#9662;</i></button>
   </div>
 
-  <!-- sidebar -->
-  <div id="side">
-    <div class="sect" id="s-sketches">
-      <header><span class="caret">&#9662;</span><span class="silk">Sketches</span>
-        <span class="grow"></span>
-        <button class="add" id="btn-newsketch" title="New sketch">+</button>
-      </header>
-      <div class="body" id="sketchlist"></div>
-    </div>
-    <div class="sect" id="s-files">
-      <header><span class="caret">&#9662;</span><span class="silk">Files</span>
-        <span class="grow"></span>
-        <button class="add" id="btn-newfile" title="Add file to sketch">+</button>
-      </header>
-      <div class="body" id="filelist"></div>
-    </div>
-    <div class="sect" id="s-out">
-      <header><span class="caret">&#9662;</span><span class="silk">Outline</span></header>
-      <div class="body" id="outline"></div>
-    </div>
-  </div>
-
+  <div id="body-row">
   <!-- editor column -->
   <div id="main">
     <div id="banner">
@@ -791,6 +861,7 @@ button,input,select,textarea{font:inherit;color:inherit}
       </div>
     </div>
   </div>
+  </div><!-- /body-row -->
 
   <!-- status strip -->
   <div id="status">
@@ -815,6 +886,7 @@ button,input,select,textarea{font:inherit;color:inherit}
     <div class="cell" id="st-cursor">Ln 1, Col 1</div>
     <div class="cell grow" id="st-msg">ready</div>
   </div>
+  </div><!-- /workspace -->
 </div>
 
 <div id="modal"><div id="mcard">
@@ -3358,7 +3430,7 @@ async function loadSketchList() {
     ? d.sketches.map(s => '<div class="row' + (s.name === St.sketch ? ' sel' : '') +
         '" data-n="' + esc(s.name) + '"><span class="dot"></span>' +
         '<span class="name">' + esc(s.name) + '</span>' +
-        '<button class="kill" title="Delete">\u00d7</button></div>').join('')
+        '<button class="kill" title="Delete">\u22ef</button></div>').join('')
     : '<div class="hint">No sketches yet. Press + to start one.</div>';
   el.querySelectorAll('.row').forEach(r => {
     r.onclick = e => {
