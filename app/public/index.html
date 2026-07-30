@@ -70,7 +70,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 #body-row{flex:1; min-height:0; display:flex}
 
-/* ---------- sidebar header: wordmark + link/activity dots ---------- */
+/* ---------- sidebar header: just the wordmark now -- the dial itself
+   carries build/upload/error status, so a separate row of status dots
+   next to the logo was pure redundant clutter. */
 #sidehead{
   display:flex; align-items:center; gap:8px; padding:22px 18px 18px;
   flex:none;
@@ -79,26 +81,11 @@ button,input,select,textarea{font:inherit;color:inherit}
   font-family:var(--cond); font-weight:700; font-size:17px;
   letter-spacing:.03em; color:var(--flux);
 }
-#sidehead .grow{flex:1}
-#ledrow{display:flex; align-items:center; gap:5px}
-.led{
-  width:8px;height:8px;border-radius:50%;
-  background:radial-gradient(circle at 32% 28%,#24272b 0%,#15171a 70%);
-  box-shadow:inset 0 1px 1.5px rgba(0,0,0,.7),inset 0 -0.5px 0 rgba(255,255,255,.03),
-    0 0.5px 0 rgba(255,255,255,.04);
-  transition:background .12s, box-shadow .12s;
-}
-.led.on{background:radial-gradient(circle at 32% 28%,#f5ffe0 0%,var(--gold) 55%,#5c7a2e 100%);
-  box-shadow:inset 0.5px 0.5px 1px rgba(255,255,255,.8),0 0 7px 1.5px rgba(199,227,110,.75)}
-.led.ok{background:radial-gradient(circle at 32% 28%,#d9ffe9 0%,var(--ok) 55%,#1f6b46 100%);
-  box-shadow:inset 0.5px 0.5px 1px rgba(255,255,255,.8),0 0 7px 1.5px rgba(70,201,139,.65)}
-.led.bad{background:radial-gradient(circle at 32% 28%,#ffd9d0 0%,var(--hot) 55%,#8a2a18 100%);
-  box-shadow:inset 0.5px 0.5px 1px rgba(255,255,255,.8),0 0 7px 1.5px rgba(228,86,60,.65)}
 
 /* ---------- the dial: a real control, not a decoration ---------- */
 .dials{display:flex; flex-direction:column; align-items:center; gap:18px;
   padding:8px 0 22px; flex:none}
-.dial{display:flex;flex-direction:column;align-items:center;gap:9px}
+.dial{display:flex;flex-direction:column;align-items:center;gap:9px;position:relative}
 .oled{
   font-family:var(--mono); font-size:9px; letter-spacing:.14em;
   padding:4px 11px; border-radius:5px; background:#08090a; color:var(--gold);
@@ -169,6 +156,36 @@ button,input,select,textarea{font:inherit;color:inherit}
   border-radius:1px; transition:transform .5s var(--ease-spring);
 }
 .knob.small .knobmark{top:16%;height:30%}
+
+/* ---------- the dial's radial menu ---------- */
+.dial-menu{
+  position:absolute; top:50%; left:50%; width:0; height:0;
+  pointer-events:none; z-index:30;
+}
+.dial-menu::before{
+  content:''; position:absolute; top:0; left:0; width:168px; height:168px;
+  transform:translate(-50%,-50%) scale(.7); border-radius:50%;
+  border:1px dashed rgba(255,255,255,.07); opacity:0;
+  transition:opacity .18s, transform .22s var(--ease-spring);
+}
+.dial-menu.open{pointer-events:auto}
+.dial-menu.open::before{opacity:1; transform:translate(-50%,-50%) scale(1)}
+.dm-item{
+  position:absolute; top:0; left:0; transform:translate(-50%,-50%) scale(.4);
+  width:56px; height:34px;
+  display:flex; align-items:center; justify-content:center;
+  border:none; border-radius:var(--r-sm); cursor:pointer;
+  background:#202226; color:var(--muted); font-family:var(--sans); font-size:10.5px;
+  box-shadow:var(--sh-1); opacity:0;
+  transition:opacity .15s, transform .2s var(--ease-spring), background .15s, color .15s;
+}
+.dial-menu.open .dm-item{opacity:1; transform:translate(-50%,-50%) scale(1)}
+.dial-menu.open .dm-item:hover, .dial-menu.open .dm-item.aim{
+  background:rgba(199,227,110,.14); color:var(--flux);
+  box-shadow:0 0 0 1px rgba(199,227,110,.3), var(--sh-1);
+  transform:translate(-50%,-50%) scale(1.12);
+}
+.dm-item .dm-lbl{pointer-events:none;white-space:nowrap}
 
 /* ---------- top bar: rounded pill controls ---------- */
 #top{
@@ -490,6 +507,15 @@ button,input,select,textarea{font:inherit;color:inherit}
 @keyframes pindoc-pop{0%{opacity:.4;transform:translateY(4px)}100%{opacity:1;transform:translateY(0)}}
 #pindoc h4{margin:0 0 4px;font-family:var(--mono);font-size:12px;
   color:var(--flux);font-weight:600}
+.pinuse{margin:2px 0 7px;padding:6px 8px;border-radius:var(--r-sm);
+  background:rgba(199,227,110,.06)}
+.pu-row{font-family:var(--mono);font-size:10.5px;color:var(--muted);
+  padding:1px 0}
+.pu-row b{color:var(--gold);font-weight:600}
+.pu-line{color:var(--wire);cursor:pointer;text-decoration:underline;
+  text-underline-offset:2px}
+.pu-line:hover{color:#8dcbe8}
+.pu-note{margin:0}
 #pindoc .tags{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 0}
 #pindoc .tag{font-family:var(--cond);font-size:9px;letter-spacing:.08em;
   text-transform:uppercase;border:1px solid var(--trace2);border-radius:2px;
@@ -781,14 +807,6 @@ button,input,select,textarea{font:inherit;color:inherit}
   <div id="side">
     <div id="sidehead">
       <b>FORGE32</b>
-      <div class="grow"></div>
-      <div id="ledrow">
-        <div class="led" id="led-link" title="backend link"></div>
-        <div class="led" id="led-build" title="build"></div>
-        <div class="led" id="led-flash" title="flash"></div>
-        <div class="led" id="led-rx" title="serial receive"></div>
-        <div class="led" id="led-tx" title="serial send"></div>
-      </div>
     </div>
     <div class="stack">
       <div class="sect" id="s-sketches">
@@ -814,19 +832,14 @@ button,input,select,textarea{font:inherit;color:inherit}
     <div class="dials">
       <div class="dial">
         <div class="oled" id="dial-oled">SETUP</div>
-        <button class="knob big" id="btn-setup" data-state="idle" title="Click: setup. Scroll: jump between functions. Ctrl/Cmd+K: command palette.">
+        <button class="knob big" id="btn-setup" data-state="idle" title="Click for the dial menu. Scroll: jump between functions. Ctrl/Cmd+K: command palette.">
           <svg class="ring" viewBox="0 0 100 100">
             <circle class="ring-track" cx="50" cy="50" r="45"></circle>
             <circle class="ring-fg" cx="50" cy="50" r="45"></circle>
           </svg>
           <span class="knobface"><span class="knobmark"></span></span>
         </button>
-      </div>
-      <div class="dial">
-        <div class="oled small">HELP</div>
-        <button class="knob small" id="btn-help" title="Keyboard shortcuts">
-          <span class="knobface"><span class="knobmark"></span></span>
-        </button>
+        <div class="dial-menu" id="dial-menu"></div>
       </div>
     </div>
   </div>
@@ -4064,14 +4077,29 @@ function selectPin(n, quiet) {
 function showPin(n, animate) {
   const p = PINS.pins.find(x => x.n === n);
   if (!p) return;
-  const used = St.usedPins && St.usedPins.has(n);
+  const uses = (St.usedPins && St.usedPins.get(n)) || [];
   const doc = $('#pindoc');
-  doc.innerHTML = '<h4>GPIO' + n + (used ? '  \u00b7  used in this sketch' : '') +
-    '</h4>' + (p.notes.length ? p.notes.map(esc).join(' ') :
-      'General purpose. No special limits.') +
+  let usageHtml = '';
+  if (uses.length) {
+    const seen = new Map();
+    for (const u of uses) {
+      const key = (u.fn || 'top level') + '|' + u.role;
+      if (!seen.has(key)) seen.set(key, u.line);
+    }
+    usageHtml = '<div class="pinuse">' + [...seen].map(([key, line]) => {
+      const [fn, role] = key.split('|');
+      return '<div class="pu-row"><b>' + esc(fn) + '()</b> ' + esc(role) +
+        ' <span class="pu-line" data-line="' + line + '">line ' + line + '</span></div>';
+    }).join('') + '</div>';
+  }
+  doc.innerHTML = '<h4>GPIO' + n + (uses.length ? '  \u00b7  used in this sketch' : '') +
+    '</h4>' + usageHtml +
+    '<p class="pu-note">' + (p.notes.length ? p.notes.map(esc).join(' ') :
+      'General purpose. No special limits.') + '</p>' +
     '<div class="tags">' + p.tags.map(t => '<span class="tag' +
       (['flash', 'strapping', 'input only', 'ADC2', 'USB', 'psram'].includes(t)
         ? ' bad' : '') + '">' + esc(t) + '</span>').join('') + '</div>';
+  doc.querySelectorAll('.pu-line').forEach(el => el.onclick = () => gotoLine(+el.dataset.line));
   if (animate) {
     doc.classList.remove('pop');
     void doc.offsetWidth;
@@ -4079,39 +4107,71 @@ function showPin(n, animate) {
   }
 }
 
+const PIN_ROLE = {
+  pinMode: 'configured', digitalWrite: 'driven high or low', digitalRead: 'read as a digital input',
+  analogRead: 'read on the ADC', analogReadMilliVolts: 'read on the ADC',
+  analogWrite: 'driven with PWM', touchRead: 'read as capacitive touch',
+  dacWrite: 'driven with the DAC', ledcAttach: 'driven with PWM', ledcWrite: 'driven with PWM',
+  ledcDetach: 'detached from PWM', attachInterrupt: 'watched for interrupts',
+  detachInterrupt: 'detached from interrupts', pulseIn: 'timed for incoming pulses',
+  tone: 'driven with a tone', noTone: 'stopped from tone output',
+  touchAttachInterrupt: 'watched for a touch interrupt',
+  digitalPinToInterrupt: 'mapped for an interrupt', esp_sleep_enable_ext0_wakeup: 'used as a wake source',
+};
+
+/* find what actually happens to each GPIO by reading the sketch, not just
+   whether it appears in it -- this is what drives the "used in this
+   sketch" detail in showPin() */
 function updatePinUse() {
   const src = ta.value || '';
   const consts = {};
   for (const m of src.matchAll(/#define\s+(\w+)\s+(\d+)\b/g)) consts[m[1]] = +m[2];
   for (const m of src.matchAll(/\b(?:const\s+)?(?:int|uint8_t|byte|gpio_num_t)\s+(\w+)\s*=\s*(?:GPIO_NUM_)?(\d+)/g))
     consts[m[1]] = +m[2];
-  const used = new Set();
-  const take = v => {
+  const used = new Map();
+  const lineOf = idx => (src.slice(0, idx).match(/\n/g) || []).length + 1;
+  const funcAt = idx => {
+    const before = src.slice(0, idx);
+    const re = /\b([A-Za-z_]\w*)\s*\([^;{)]*\)\s*\{/g;
+    let last = null, m;
+    while ((m = re.exec(before))) {
+      if (!['if', 'for', 'while', 'switch', 'else'].includes(m[1])) last = m[1];
+    }
+    return last;
+  };
+  const record = (v, idx, role) => {
     v = v.trim();
-    let n = /^\d+$/.test(v) ? +v
+    const n = /^\d+$/.test(v) ? +v
       : /^GPIO_NUM_(\d+)$/.test(v) ? +RegExp.$1
       : consts[v];
-    if (Number.isInteger(n) && n >= 0 && n <= 48) used.add(n);
+    if (!Number.isInteger(n) || n < 0 || n > 48) return;
+    if (!used.has(n)) used.set(n, []);
+    used.get(n).push({ role, line: lineOf(idx), fn: funcAt(idx) || 'top level' });
   };
-  const single = /\b(?:pinMode|digitalWrite|digitalRead|analogRead|analogReadMilliVolts|analogWrite|touchRead|dacWrite|ledcAttach|ledcWrite|ledcDetach|attachInterrupt|detachInterrupt|pulseIn|tone|noTone|touchAttachInterrupt|digitalPinToInterrupt|esp_sleep_enable_ext0_wakeup)\s*\(\s*([A-Za-z_]\w*|\d+|GPIO_NUM_\d+)/g;
-  for (const m of src.matchAll(single)) take(m[1]);
-  for (const m of src.matchAll(/\.attach\s*\(\s*([A-Za-z_]\w*|\d+)/g)) take(m[1]);
-  for (const m of src.matchAll(/Wire1?\.(?:begin|setPins)\s*\(([^)]*)\)/g))
-    m[1].split(',').slice(0, 2).forEach(take);
-  for (const m of src.matchAll(/SPI\.begin\s*\(([^)]*)\)/g))
-    m[1].split(',').slice(0, 4).forEach(take);
+  const single = /\b(pinMode|digitalWrite|digitalRead|analogRead|analogReadMilliVolts|analogWrite|touchRead|dacWrite|ledcAttach|ledcWrite|ledcDetach|attachInterrupt|detachInterrupt|pulseIn|tone|noTone|touchAttachInterrupt|digitalPinToInterrupt|esp_sleep_enable_ext0_wakeup)\s*\(\s*([A-Za-z_]\w*|\d+|GPIO_NUM_\d+)/g;
+  for (const m of src.matchAll(single)) record(m[2], m.index, PIN_ROLE[m[1]] || 'used');
+  for (const m of src.matchAll(/\.attach\s*\(\s*([A-Za-z_]\w*|\d+)/g)) record(m[1], m.index, 'driven with PWM');
+  for (const m of src.matchAll(/Wire1?\.(?:begin|setPins)\s*\(([^)]*)\)/g)) {
+    const labels = ['the I2C data line (SDA)', 'the I2C clock line (SCL)'];
+    m[1].split(',').slice(0, 2).forEach((a, i) => record(a, m.index, labels[i]));
+  }
+  for (const m of src.matchAll(/SPI\.begin\s*\(([^)]*)\)/g)) {
+    const labels = ['the SPI clock (SCK)', 'SPI data in (MISO)', 'SPI data out (MOSI)', 'an SPI chip select'];
+    m[1].split(',').slice(0, 4).forEach((a, i) => record(a, m.index, labels[i]));
+  }
   for (const m of src.matchAll(/Adafruit_NeoPixel\s*\w*\s*\(\s*[^,]+,\s*([A-Za-z_]\w*|\d+)/g))
-    take(m[1]);
+    record(m[1], m.index, 'driving a NeoPixel strip');
   St.usedPins = used;
   $$('#pins .pin').forEach(el =>
     el.classList.toggle('used', used.has(+el.dataset.p)));
-  const risky = [...used].filter(n => {
+  if (St.selectedPin != null && used.has(St.selectedPin)) showPin(St.selectedPin);
+  const riskyNums = [...used.keys()].filter(n => {
     const p = PINS.pins.find(x => x.n === n);
     return p && p.tags.some(t => ['flash', 'psram', 'USB'].includes(t));
   });
-  if (risky.length && !St.warnedPins) {
+  if (riskyNums.length && !St.warnedPins) {
     St.warnedPins = true;
-    toast('GPIO' + risky.join(', GPIO') + ' is reserved on this chip. Check the Pins tab.', 'bad');
+    toast('GPIO' + riskyNums.join(', GPIO') + ' is reserved on this chip. Check the Pins tab.', 'bad');
   }
 }
 
@@ -4130,8 +4190,9 @@ $('#btn-update').onclick = async () => {
   toast('Core and index updated');
 };
 $('#btn-erase').onclick = async () => {
-  if (!confirm('Erase the entire flash on the connected board? Firmware, ' +
-      'saved settings and files all go away.')) return;
+  const ok = await confirmModal('Erase whole flash', 'Erase the entire flash on the ' +
+    'connected board? Firmware, saved settings and files all go away.', 'Erase');
+  if (!ok) return;
   showConsole('out');
   try {
     const res = await streamApi('/api/erase', { port: SET.port }, (evt) => {
@@ -4152,8 +4213,7 @@ $('#btn-upload').onclick = () => build(true);
 $('#btn-save').onclick = () => saveSketch(false);
 $('#btn-newsketch').onclick = newSketch;
 $('#btn-newfile').onclick = newFile;
-$('#btn-setup').onclick = openSetup;
-$('#btn-help').onclick = showHelp;
+$('#btn-setup').onclick = toggleDialMenu;
 $('#st-board').onclick = () => $('#sel-board').focus();
 $('#st-port').onclick = () => $('#sel-port').focus();
 $('#mob-side').onclick = () => $('#side').classList.toggle('open');
@@ -4220,12 +4280,85 @@ function setDial(state, label, opts) {
   }
 }
 
-/* scroll the big dial to step through this file's functions -- the ring's
-   knurl mark keeps turning (with a spring settle) so the motion reads as
-   continuous rather than snapping straight to the new position */
+/* ---------------- the dial's radial menu ----------------
+   Clicking the dial opens a small circular menu around it instead of
+   jumping straight to Setup. Hovering an item (or scrolling, with the
+   menu open) turns the knurl mark to visually point at it -- the dial
+   itself is the selection indicator, not just a button with a light. */
+const DIAL_ITEMS = [
+  { label: 'Setup', run: () => openSetup() },
+  { label: 'Rebuild', run: () => { St.cleanNext = true; toast('Next build starts from scratch'); build(false); } },
+  { label: 'Update core', run: () => $('#btn-update').click() },
+  { label: 'Erase flash', run: () => $('#btn-erase').click() },
+  { label: 'Shortcuts', run: () => showHelp() },
+  { label: 'Commands', run: () => openPalette() },
+];
+const DIAL_R = 84;
+function dialAngleFor(i) { return -90 + (360 / DIAL_ITEMS.length) * i; }
+
+function buildDialMenu() {
+  const menu = $('#dial-menu');
+  menu.innerHTML = DIAL_ITEMS.map((it, i) => {
+    const rad = dialAngleFor(i) * Math.PI / 180;
+    const x = (Math.cos(rad) * DIAL_R).toFixed(1), y = (Math.sin(rad) * DIAL_R).toFixed(1);
+    return '<button class="dm-item" data-i="' + i + '" style="left:' + x + 'px;top:' + y + 'px">' +
+      '<span class="dm-lbl">' + esc(it.label) + '</span></button>';
+  }).join('');
+  $$('#dial-menu .dm-item').forEach((el) => {
+    const i = +el.dataset.i;
+    el.onmouseenter = () => { dialMenuAim = i; pointDialAt(i); };
+    el.onclick = (e) => { e.stopPropagation(); closeDialMenu(); DIAL_ITEMS[i].run(); };
+  });
+}
+
+function pointDialAt(i) {
+  const mark = document.querySelector('#btn-setup .knobmark');
+  if (mark) mark.style.transform = 'translateX(-50%) rotate(' + (dialAngleFor(i) + 90) + 'deg)';
+  $$('#dial-menu .dm-item').forEach((el, idx) => el.classList.toggle('aim', idx === i));
+}
+
+let dialMenuOpen = false, dialMenuAim = null;
+function onDialMenuOutsideClick(e) { if (!e.target.closest('.dial')) closeDialMenu(); }
+function openDialMenu() {
+  if (dialMenuOpen) return;
+  dialMenuOpen = true;
+  dialMenuAim = null;
+  $('#dial-menu').classList.add('open');
+  setTimeout(() => document.addEventListener('click', onDialMenuOutsideClick), 0);
+}
+function closeDialMenu() {
+  if (!dialMenuOpen) return;
+  dialMenuOpen = false;
+  $('#dial-menu').classList.remove('open');
+  $$('#dial-menu .dm-item').forEach(el => el.classList.remove('aim'));
+  document.removeEventListener('click', onDialMenuOutsideClick);
+  const mark = document.querySelector('#btn-setup .knobmark');
+  if (mark) mark.style.transform = 'translateX(-50%) rotate(' + dialAngle + 'deg)';
+}
+function toggleDialMenu() { dialMenuOpen ? closeDialMenu() : openDialMenu(); }
+buildDialMenu();
+addEventListener('keydown', (e) => {
+  if (!dialMenuOpen) return;
+  if (e.key === 'Escape') { e.preventDefault(); closeDialMenu(); }
+  else if (e.key === 'Enter' && dialMenuAim != null) {
+    e.preventDefault();
+    const it = DIAL_ITEMS[dialMenuAim];
+    closeDialMenu();
+    it.run();
+  }
+});
+
+/* scroll the big dial to step through this file's functions when the menu
+   is closed, or to move the highlighted menu item when it's open -- the
+   knurl mark keeps turning (with a spring settle) either way, so the
+   motion reads as continuous rather than snapping straight to position */
 let dialAngle = 0;
 $('#btn-setup').addEventListener('wheel', (e) => {
   e.preventDefault();
+  if (dialMenuOpen) {
+    dialMenuAim = ((dialMenuAim ?? -1) + (e.deltaY > 0 ? 1 : -1) + DIAL_ITEMS.length) % DIAL_ITEMS.length;
+    return pointDialAt(dialMenuAim);
+  }
   const items = St.outline || [];
   if (!items.length) return toast('No functions in this file yet', null);
   dialAngle += e.deltaY > 0 ? 24 : -24;
