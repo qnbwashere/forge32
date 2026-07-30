@@ -84,3 +84,6 @@ jobs:
             dist/FORGE32-mac-arm64.dmg
             dist/FORGE32-mac-x64.dmg
             dist/FORGE32-win-x64.exe
+            dist/*.zip
+            dist/*.blockmap
+            dist/latest*.yml
