@@ -429,21 +429,33 @@ const api = {
     return { ok: true, sketches: await listSketches(), sketchbook: SKETCHBOOK };
   },
 
+  // A sketch is a small folder of source files, not one file, so both of
+  // these deal in the whole set at once: the editor keeps every open file
+  // in memory and only talks to disk on open and save.
   async 'GET /api/sketch'(q) {
-    const dir = safeSketchPath(q.get('name') || '');
-    const file = path.join(dir, path.basename(q.get('file') || ''));
-    safeSketchPath(path.relative(SKETCHBOOK, file));
-    const code = await fsp.readFile(file, 'utf8');
-    return { ok: true, code };
+    const name = q.get('name') || '';
+    const dir = safeSketchPath(name);
+    const entries = await fsp.readdir(dir, { withFileTypes: true }).catch(() => []);
+    const files = {};
+    let main = null;
+    for (const e of entries) {
+      if (!e.isFile() || !/\.(ino|h|hpp|c|cpp)$/i.test(e.name)) continue;
+      files[e.name] = await fsp.readFile(path.join(dir, e.name), 'utf8');
+      if (!main && /\.ino$/i.test(e.name)) main = e.name;
+    }
+    if (!Object.keys(files).length) throw new Error('Sketch not found: ' + name);
+    return { ok: true, name, files, main: main || Object.keys(files)[0] };
   },
 
   async 'POST /api/sketch'(body) {
     const dir = safeSketchPath(body.name || '');
     await fsp.mkdir(dir, { recursive: true });
-    const file = path.join(dir, path.basename(body.file || (body.name + '.ino')));
-    safeSketchPath(path.relative(SKETCHBOOK, file));
-    await fsp.writeFile(file, String(body.code ?? ''), 'utf8');
-    return { ok: true, path: file };
+    for (const [file, code] of Object.entries(body.files || {})) {
+      const full = path.join(dir, path.basename(file));
+      safeSketchPath(path.relative(SKETCHBOOK, full));
+      await fsp.writeFile(full, String(code ?? ''), 'utf8');
+    }
+    return { ok: true, path: dir };
   },
 
   async 'POST /api/sketch/new'(body) {
@@ -517,6 +529,21 @@ const api = {
     }
     return { ok: true, groups };
   },
+
+  async 'GET /api/board-options'(q) {
+    const fqbn = q.get('fqbn') || '';
+    if (!CLI || !fqbn) return { ok: true, options: [] };
+    const r = await runJson(['board', 'details', '--fqbn', fqbn]);
+    const raw = r.data?.config_options || [];
+    const options = raw.map((o) => ({
+      option: o.option,
+      label: o.option_label || o.option,
+      values: (o.values || []).map((v) => ({
+        value: v.value, label: v.value_label || v.value, selected: !!v.selected,
+      })),
+    }));
+    return { ok: true, options };
+  },
 };
 
 function describeBridge(vid, pid) {
@@ -569,7 +596,12 @@ async function handleSetup(body, stm) {
 
 async function handleCompile(body, stm, { upload } = {}) {
   const name = body.name;
-  const fqbn = body.fqbn || 'esp32:esp32:esp32';
+  let fqbn = body.fqbn || 'esp32:esp32:esp32';
+  // Board config options (partition scheme, upload speed, and the like) are
+  // menu selections appended straight onto the fqbn, not build properties.
+  if (body.options && Object.keys(body.options).length) {
+    fqbn += ':' + Object.entries(body.options).map(([k, v]) => k + '=' + v).join(',');
+  }
   const port = body.port || '';
   const dir = safeSketchPath(name || '');
 
@@ -592,7 +624,6 @@ async function handleCompile(body, stm, { upload } = {}) {
   const collect = (l) => lines.push(l);
 
   const args = ['compile', '--fqbn', fqbn, dir, '--warnings', 'default'];
-  if (body.buildProps) for (const p of body.buildProps) args.push('--build-property', p);
 
   stm.send({ t: 'note', line: 'Building for ' + fqbn });
   const t0 = Date.now();

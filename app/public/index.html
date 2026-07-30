@@ -717,10 +717,10 @@ button,input,select,textarea{font:inherit;color:inherit}
           <input type="text" id="sertx" placeholder="send to board and press Enter"
             aria-label="Send to serial port">
           <select id="sel-ending" title="Line ending">
-            <option value="\n">LF</option>
-            <option value="\r\n">CRLF</option>
-            <option value="\r">CR</option>
-            <option value="">none</option>
+            <option value="lf">LF</option>
+            <option value="crlf">CRLF</option>
+            <option value="cr">CR</option>
+            <option value="none">none</option>
           </select>
           <label class="chk"><input type="checkbox" id="cb-ts">time</label>
           <label class="chk"><input type="checkbox" id="cb-auto" checked>scroll</label>
@@ -2796,7 +2796,7 @@ function closeFind() {
 /* ====================================================================
    Application layer
    ==================================================================== */
-let ONLINE = false, HEALTH = {}, SET = {}, curJob = null, serialES = null;
+let ONLINE = false, HEALTH = {}, SET = {};
 
 async function api(path, body) {
   const opt = body !== undefined
@@ -2807,6 +2807,47 @@ async function api(path, body) {
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || ('request failed with ' + r.status));
   return data;
+}
+
+/* The server answers setup, compile, upload, lib install/uninstall, erase
+   and the serial monitor with newline delimited JSON on the same
+   connection, no job id, no separate event source. This reads that
+   stream directly and calls onEvent for every line as it arrives.
+   Resolves with the last event once the connection ends (the server's
+   own 'done' or 'closed' marker, whichever call it is). */
+function streamApi(path, body, onEvent, signal) {
+  return fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+    signal,
+  }).then(async (r) => {
+    if (!r.body) throw new Error('request failed with ' + r.status);
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '', last = {};
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n');
+      buf = parts.pop();
+      for (const part of parts) {
+        if (!part) continue;
+        let evt;
+        try { evt = JSON.parse(part); } catch { continue; }
+        last = evt;
+        if (onEvent) onEvent(evt);
+      }
+    }
+    if (!r.ok && !last.line) throw new Error('request failed with ' + r.status);
+    return last;
+  });
+}
+
+/* Turns a stream event into the class logOut already understands. */
+function clsFor(t) {
+  return t === 'cmd' ? 'cmd' : t === 'err' ? 'err' : t === 'ok' ? 'ok' : t === 'note' || t === 'hint' ? 'note' : '';
 }
 
 /* ---------------- little helpers ---------------- */
@@ -2876,7 +2917,15 @@ $$('.sect>header').forEach(h => h.onclick = e => {
 /* ---------------- health and setup ---------------- */
 async function checkHealth() {
   try {
-    HEALTH = await api('/api/health');
+    const status = await api('/api/status');
+    HEALTH = {
+      cli: !!status.cli,
+      esp32Core: !!(status.esp32 && status.esp32.installed),
+      esp32Version: status.esp32 && status.esp32.installed,
+      ready: !!(status.cli && status.esp32 && status.esp32.installed),
+      sketchbook: status.sketchbook,
+      cliVersion: status.cliVersion,
+    };
     ONLINE = true;
     setLed('link', HEALTH.ready ? 'ok' : 'on');
   } catch (e) {
@@ -2890,8 +2939,7 @@ async function checkHealth() {
 function paintBanner() {
   const b = $('#banner'), t = $('#bantext'), act = $('#ban-act');
   if (!ONLINE) {
-    t.textContent = 'Running without the local helper, so the editor works but ' +
-      'building and flashing do not. Start it with: python3 server.py';
+    t.textContent = 'Can’t reach the FORGE32 backend. Try restarting the app.';
     act.textContent = 'How';
     act.onclick = showOfflineHelp;
     b.classList.add('on');
@@ -2911,55 +2959,29 @@ function paintBanner() {
     b.classList.add('on');
     return;
   }
-  if (!HEALTH.pyserial) {
-    t.textContent = 'The serial monitor needs pyserial. Everything else works.';
-    act.textContent = 'How';
-    act.onclick = () => modal('Serial monitor', '<p>Install pyserial, then restart ' +
-      'the helper:</p><p><code>pip install pyserial</code></p>');
-    b.classList.add('on');
-    return;
-  }
   b.classList.remove('on');
 }
 $('#ban-hide').onclick = () => $('#banner').classList.remove('on');
 
 function showOfflineHelp() {
-  modal('Start the local helper', `
-    <p>The editor, suggestions and pin map all run in the browser. Compiling
-    and flashing need the small Python helper, because that is what talks to
-    the USB port and the compiler.</p>
-    <p>Put <code>server.py</code> and <code>index.html</code> in the same
-    folder, then run:</p>
-    <p><code>pip install pyserial</code><br><code>python3 server.py</code></p>
-    <p>Open <code>http://127.0.0.1:8787</code> and this bar disappears.</p>`);
+  modal('FORGE32 is not responding', `
+    <p>The editor, suggestions and pin map all run in this window, but they
+    talk to a small backend built into FORGE32 itself for anything that
+    touches the compiler or a USB port. That backend did not answer.</p>
+    <p>Quit FORGE32 fully and reopen it. If it keeps happening, check the
+    app's error dialog for a stack trace and report it.</p>`);
 }
 
-const SETUP_STEPS = [
-  { id: 'cli', title: 'Install arduino-cli',
-    note: 'The compiler driver, about 30 MB, goes in your home folder.' },
-  { id: 'index', title: 'Add the Espressif board index',
-    note: 'Points arduino-cli at the official ESP32 package list.' },
-  { id: 'core', title: 'Install ESP32 board support',
-    note: 'The toolchain and libraries. Around 1 GB, so it takes a while.' },
-];
-
 function openSetup() {
-  const state = id => {
-    if (id === 'cli') return HEALTH.cli ? 'ok' : 'idle';
-    if (id === 'index') return HEALTH.cli ? 'idle' : 'idle';
-    if (id === 'core') return HEALTH.esp32Core ? 'ok' : 'idle';
-    return 'idle';
-  };
-  const rows = SETUP_STEPS.map((s, i) => `
-    <div class="step" data-step="${s.id}">
-      <span class="num">${i + 1}</span>
-      <span class="txt"><b>${s.title}</b><small>${s.note}</small></span>
-      <span class="state ${state(s.id)}" data-state>${
-        state(s.id) === 'ok' ? 'done' : 'pending'}</span>
-    </div>`).join('');
-  modal('Setup', `
-    <p>Three steps, top to bottom. Progress shows in the Output tab.</p>
-    ${rows}
+  modal('Set up the toolchain', `
+    <p>One step: FORGE32 registers the Espressif package index, downloads
+    it, then installs the ESP32 board support. It only downloads what is
+    missing, so running this again is harmless.</p>
+    <div class="step" data-step="all">
+      <span class="txt"><b>Install arduino-cli's ESP32 core</b>
+        <small>Around 1 GB the first time, seconds after that.</small></span>
+      <span class="state idle" data-state>pending</span>
+    </div>
     <div style="margin-top:14px;border-top:1px solid var(--trace);padding-top:12px">
       <div class="silk" style="margin-bottom:6px">Model suggestions</div>
       <p style="margin-bottom:8px">Optional. With a key, Ctrl+Shift+P asks a
@@ -2969,10 +2991,10 @@ function openSetup() {
         background:var(--mask);border:1px solid var(--trace2);border-radius:3px;
         padding:6px 8px;font-family:var(--mono);font-size:11.5px">
     </div>
-    <p style="margin-top:12px;color:var(--dim)">Workspace: <code>${
-      HEALTH.home || 'unknown'}</code></p>`,
+    <p style="margin-top:12px;color:var(--dim)">Sketchbook: <code>${
+      esc(HEALTH.sketchbook || 'unknown')}</code></p>`,
     '<button class="btn" data-close>Close</button>' +
-    '<button class="btn go" id="setup-run">Run all steps</button>');
+    '<button class="btn go" id="setup-run">Run setup</button>');
   const ai = $('#aikey');
   ai.value = aiKey;
   ai.oninput = () => { aiKey = ai.value.trim(); };
@@ -2981,58 +3003,27 @@ function openSetup() {
 
 async function runSetup() {
   showConsole('out');
-  for (const s of SETUP_STEPS) {
-    const row = $('#modal [data-step="' + s.id + '"]');
-    const st = row && row.querySelector('[data-state]');
-    if (st && st.textContent === 'done') continue;
-    if (st) { st.className = 'state run'; st.textContent = 'running'; }
-    logOut('--- ' + s.title + ' ---', 'note');
-    try {
-      const { job } = await api('/api/setup', { step: s.id });
-      const res = await followJob(job);
-      if (st) {
-        st.className = 'state ' + (res.status === 'ok' ? 'ok' : 'bad');
-        st.textContent = res.status === 'ok' ? 'done' : 'failed';
-      }
-      if (res.status !== 'ok') {
-        toast(s.title + ' failed, see Output', 'bad');
-        break;
-      }
-    } catch (e) {
-      if (st) { st.className = 'state bad'; st.textContent = 'failed'; }
-      logOut(String(e.message), 'err');
-      break;
+  const row = $('#modal [data-step="all"]');
+  const st = row && row.querySelector('[data-state]');
+  if (st) { st.className = 'state run'; st.textContent = 'running'; }
+  logOut('--- Setup ---', 'note');
+  try {
+    const res = await streamApi('/api/setup', {}, (evt) => {
+      if (evt.line) logOut(evt.line, clsFor(evt.t));
+    });
+    if (st) {
+      st.className = 'state ' + (res.ok ? 'ok' : 'bad');
+      st.textContent = res.ok ? 'done' : 'failed';
     }
+    if (!res.ok) toast('Setup did not finish, see Output', 'bad');
+  } catch (e) {
+    if (st) { st.className = 'state bad'; st.textContent = 'failed'; }
+    logOut(String(e.message), 'err');
   }
   await checkHealth();
   await loadBoards();
   toast(HEALTH.ready ? 'Toolchain ready' : 'Setup did not finish, see Output',
         HEALTH.ready ? 'good' : 'bad');
-}
-
-/* ---------------- jobs ---------------- */
-function followJob(id) {
-  return new Promise(resolve => {
-    const es = new EventSource('/api/job/stream?id=' + id);
-    curJob = id;
-    es.onmessage = ev => {
-      const r = JSON.parse(ev.data);
-      if (r.c === 'end') {
-        es.close();
-        curJob = null;
-        api('/api/job?id=' + id).then(resolve).catch(() => resolve({ status: 'failed' }));
-        return;
-      }
-      logOut(r.s, r.c === 'cmd' ? 'cmd' : r.c === 'err' ? 'err' : '');
-      const pm = /\((\d+)\s*%\)/.exec(r.s);
-      if (pm) setStatus('flashing ' + pm[1] + '%');
-    };
-    es.onerror = () => {
-      es.close();
-      curJob = null;
-      api('/api/job?id=' + id).then(resolve).catch(() => resolve({ status: 'failed' }));
-    };
-  });
 }
 
 async function build(upload) {
@@ -3051,21 +3042,26 @@ async function build(upload) {
   setStatus(upload ? 'compiling and flashing' : 'compiling');
   $('#btn-verify').disabled = $('#btn-upload').disabled = true;
   const t0 = performance.now();
+  let size = null;
   try {
-    const { job } = await api(upload ? '/api/upload' : '/api/compile', {
+    St.cleanNext = false;
+    const res = await streamApi(upload ? '/api/upload' : '/api/compile', {
       name: St.sketch, files: St.files, fqbn: SET.fqbn, port: SET.port,
       options: SET.options, clean: St.cleanNext, verify: false,
+    }, (evt) => {
+      if (evt.t === 'diags') { St.diags = evt.diags || []; size = evt.size; return; }
+      if (evt.line) {
+        logOut(evt.line, clsFor(evt.t));
+        const pm = /\((\d+)\s*%\)/.exec(evt.line);
+        if (pm) setStatus('flashing ' + pm[1] + '%');
+      }
     });
-    St.cleanNext = false;
-    const res = await followJob(job);
-    St.diags = res.diagnostics || [];
     paintProblems();
     render();
-    if (res.size) paintSize(res.size);
+    if (size) paintSize(size);
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
-    if (res.status === 'ok') {
+    if (res.ok) {
       setLed(upload ? 'flash' : 'build', 'ok');
-      logOut((upload ? 'Uploaded' : 'Compiled') + ' in ' + secs + ' s', 'ok');
       setStatus((upload ? 'uploaded' : 'compiled') + ' in ' + secs + ' s');
       toast(upload ? 'Uploaded to the board' : 'Compiled with no errors', 'good');
       if (upload && !SERIAL_OPEN) setTimeout(() => openSerial(true), 700);
@@ -3123,18 +3119,18 @@ function explainFailure() {
 }
 
 function paintSize(s) {
-  if (s.flashUsed && s.flashTotal) {
-    const pct = s.flashUsed / s.flashTotal * 100;
+  if (s.flash && s.flash.used && s.flash.max) {
+    const pct = s.flash.used / s.flash.max * 100;
     $('#bar-flash').style.width = Math.min(100, pct) + '%';
     $('#bar-flash').className = pct > 90 ? 'hi' : '';
-    $('#st-flash').textContent = Math.round(s.flashUsed / 1024) + ' kB / ' +
+    $('#st-flash').textContent = Math.round(s.flash.used / 1024) + ' kB / ' +
       Math.round(pct) + '%';
   }
-  if (s.ramUsed && s.ramTotal) {
-    const pct = s.ramUsed / s.ramTotal * 100;
+  if (s.ram && s.ram.used && s.ram.max) {
+    const pct = s.ram.used / s.ram.max * 100;
     $('#bar-ram').style.width = Math.min(100, pct) + '%';
     $('#bar-ram').className = pct > 85 ? 'hi' : '';
-    $('#st-ram').textContent = Math.round(s.ramUsed / 1024) + ' kB / ' +
+    $('#st-ram').textContent = Math.round(s.ram.used / 1024) + ' kB / ' +
       Math.round(pct) + '%';
   }
 }
@@ -3284,7 +3280,7 @@ async function loadBoardOptions() {
 async function loadSketchList() {
   const el = $('#sketchlist');
   if (!ONLINE) {
-    el.innerHTML = '<div class="hint">Saved sketches need the local helper.</div>';
+    el.innerHTML = '<div class="hint">Can’t reach the FORGE32 backend.</div>';
     return;
   }
   const d = await api('/api/sketches');
@@ -3405,62 +3401,61 @@ async function saveSketch(quiet) {
   if (!quiet) { toast('Saved', 'good'); setStatus('saved'); }
 }
 
+/* Board, port and window preferences are pure client state: no reason to
+   round trip them through the backend, so they just live in localStorage. */
 function saveSettings() {
-  if (!ONLINE) return;
   clearTimeout(saveSettings.t);
-  saveSettings.t = setTimeout(() => api('/api/settings', {
-    fqbn: SET.fqbn, port: SET.port, options: SET.options,
-    baud: +$('#sel-baud').value, lastSketch: SET.lastSketch,
-  }).catch(() => {}), 300);
+  saveSettings.t = setTimeout(() => {
+    try {
+      localStorage.setItem('forge32-settings', JSON.stringify({
+        fqbn: SET.fqbn, port: SET.port, options: SET.options,
+        baud: +$('#sel-baud').value, lastSketch: SET.lastSketch,
+      }));
+    } catch (e) {}
+  }, 300);
 }
 
 /* ---------------- serial monitor ---------------- */
 let SERIAL_OPEN = false;
 const plot = { series: new Map(), max: 240, on: false };
 
+let monitorAbort = null;
+
 async function openSerial(silent) {
   if (!ONLINE) return showOfflineHelp();
-  if (!HEALTH.pyserial)
-    return modal('Serial monitor', '<p>The monitor needs pyserial:</p>' +
-      '<p><code>pip install pyserial</code></p><p>Then restart the helper.</p>');
+  if (!HEALTH.cli)
+    return modal('Serial monitor', '<p>The monitor runs through arduino-cli, ' +
+      'which is not installed yet. Open Setup in the sidebar.</p>');
   if (!SET.port) return toast('Pick a port first', 'bad');
-  try {
-    await api('/api/serial/open', { port: SET.port, baud: +$('#sel-baud').value });
-    SERIAL_OPEN = true;
-    $('#btn-monitor').textContent = 'Close monitor';
-    showConsole('ser');
-    startSerialStream();
-    if (!silent) toast('Monitor open on ' + SET.port, 'good');
-  } catch (e) { toast(e.message, 'bad'); }
+  if (monitorAbort) return;
+  monitorAbort = new AbortController();
+  SERIAL_OPEN = true;
+  $('#btn-monitor').textContent = 'Close monitor';
+  showConsole('ser');
+  if (!silent) toast('Opening monitor on ' + SET.port, 'good');
+  streamApi('/api/monitor', { port: SET.port, baud: +$('#sel-baud').value },
+    (evt) => {
+      if (evt.t === 'rx') { serialWrite(evt.line + '\n'); blip('rx'); }
+      else if (evt.t === 'open') serialWrite('\u2014 ' + evt.line + ' \u2014\n', 'sys');
+      else if (evt.t === 'closed') serialWrite('\u2014 ' + evt.line + ' \u2014\n', 'sys');
+      else if (evt.t === 'err') serialWrite('\u2014 ' + evt.line + ' \u2014\n', 'sys');
+    }, monitorAbort.signal)
+    .catch(() => {})
+    .finally(() => {
+      SERIAL_OPEN = false;
+      monitorAbort = null;
+      $('#btn-monitor').innerHTML = 'Monitor <kbd>^M</kbd>';
+      setLed('rx', ''); setLed('tx', '');
+    });
 }
 
 async function closeSerial() {
-  try { await api('/api/serial/close', {}); } catch (e) {}
+  const port = SET.port;
+  if (monitorAbort) { monitorAbort.abort(); monitorAbort = null; }
   SERIAL_OPEN = false;
   $('#btn-monitor').innerHTML = 'Monitor <kbd>^M</kbd>';
   setLed('rx', ''); setLed('tx', '');
-}
-
-function startSerialStream() {
-  if (serialES) return;
-  serialES = new EventSource('/api/serial/stream');
-  serialES.onmessage = ev => {
-    const m = JSON.parse(ev.data);
-    if (m.type === 'data') { serialWrite(m.text); blip('rx'); }
-    else if (m.type === 'tx') { serialWrite(m.text, 'tx'); blip('tx'); }
-    else if (m.type === 'open') {
-      SERIAL_OPEN = true;
-      $('#btn-monitor').textContent = 'Close monitor';
-      serialWrite('\u2014 open on ' + m.port + ' at ' + m.baud + ' baud \u2014\n', 'sys');
-    } else if (m.type === 'closed') {
-      SERIAL_OPEN = false;
-      $('#btn-monitor').innerHTML = 'Monitor <kbd>^M</kbd>';
-      serialWrite('\u2014 port closed \u2014\n', 'sys');
-    } else if (m.type === 'note') serialWrite('\u2014 ' + m.text + ' \u2014\n', 'sys');
-    else if (m.type === 'error') serialWrite('\u2014 ' + m.message + ' \u2014\n', 'sys');
-    else if (m.type === 'hello' && m.open) SERIAL_OPEN = true;
-  };
-  serialES.onerror = () => { serialES.close(); serialES = null; };
+  try { await api('/api/monitor/stop', { port }); } catch (e) {}
 }
 
 let serPartial = '';
@@ -3495,8 +3490,9 @@ $('#sertx').addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   const v = e.target.value;
   if (!v || !SERIAL_OPEN) return;
-  const map = { '\\n': '\n', '\\r\\n': '\r\n', '\\r': '\r', '': '' };
-  api('/api/serial/send', { text: v, ending: map[$('#sel-ending').value] ?? '\n' })
+  serialWrite(v + '\n', 'tx');
+  blip('tx');
+  api('/api/monitor/write', { port: SET.port, text: v, eol: $('#sel-ending').value })
     .catch(err => toast(err.message, 'bad'));
   e.target.value = '';
 });
@@ -3600,19 +3596,18 @@ async function loadInstalled() {
   const el = $('#libresults');
   if (!ONLINE || !HEALTH.cli) {
     el.innerHTML = '<div class="hint" style="padding-left:0">Library management ' +
-      'needs the local helper and arduino-cli.</div>';
+      'needs arduino-cli. Open Setup in the sidebar.</div>';
     return;
   }
   el.innerHTML = '<div class="hint" style="padding-left:0">reading</div>';
   try {
-    const d = await api('/api/libs/installed');
-    if (!d.libs.length) {
+    const d = await api('/api/libraries');
+    if (!d.installed.length) {
       el.innerHTML = '<div class="hint" style="padding-left:0">Nothing installed ' +
         'beyond what ships with the ESP32 core. Try the Registry tab.</div>';
       return;
     }
-    el.innerHTML = d.libs.map(e => {
-      const l = e.library || {};
+    el.innerHTML = d.installed.map(l => {
       return '<div class="card"><h5>' + esc(l.name || '') +
         '<span class="v">' + esc(l.version || '') + '</span></h5>' +
         '<p>' + esc(l.sentence || '') + '</p><div class="foot">' +
@@ -3632,21 +3627,23 @@ async function searchLibs() {
   if (!ONLINE || !HEALTH.cli) return loadInstalled();
   el.innerHTML = '<div class="hint" style="padding-left:0">searching</div>';
   try {
-    const d = await api('/api/libs/search?q=' + encodeURIComponent(q));
-    if (!d.libs.length) {
+    const d = await api('/api/libraries?q=' + encodeURIComponent(q));
+    if (!d.libraries.length) {
       el.innerHTML = '<div class="hint" style="padding-left:0">No matches. ' +
         'Try a shorter word.</div>';
       return;
     }
-    const esp = d.libs.filter(l => !l.architectures.length ||
+    const esp = d.libraries.filter(l => !l.architectures.length ||
       l.architectures.includes('*') || l.architectures.includes('esp32'));
-    const rest = d.libs.filter(l => !esp.includes(l));
+    const rest = d.libraries.filter(l => !esp.includes(l));
     el.innerHTML = [...esp, ...rest].slice(0, 60).map(l =>
       '<div class="card"><h5>' + esc(l.name) + '<span class="v">' +
       esc(l.version) + '</span></h5><p>' + esc(l.sentence) + '</p>' +
       '<div class="foot"><span class="who">' + esc(l.author) +
       (esp.includes(l) ? '' : ' \u00b7 not listed for esp32') + '</span>' +
-      '<button class="mini" data-add="' + esc(l.name) + '">Install</button>' +
+      '<button class="mini" data-add="' + esc(l.name) + '"' +
+      (l.installed ? ' disabled' : '') + '>' +
+      (l.installed ? 'installed' : 'Install') + '</button>' +
       '</div></div>').join('');
     wireLibButtons();
   } catch (e) {
@@ -3659,18 +3656,20 @@ function wireLibButtons() {
     b.disabled = true;
     b.textContent = 'installing';
     showConsole('out');
-    const { job } = await api('/api/libs/install', { name: b.dataset.add });
-    const res = await followJob(job);
-    b.textContent = res.status === 'ok' ? 'installed' : 'failed';
-    toast(res.status === 'ok' ? b.dataset.add + ' installed'
-                              : 'Install failed, see Output',
-          res.status === 'ok' ? 'good' : 'bad');
+    const res = await streamApi('/api/lib/install', { name: b.dataset.add }, (evt) => {
+      if (evt.line) logOut(evt.line, clsFor(evt.t));
+    });
+    b.textContent = res.ok ? 'installed' : 'failed';
+    toast(res.ok ? b.dataset.add + ' installed' : 'Install failed, see Output',
+          res.ok ? 'good' : 'bad');
   });
   $$('#libresults [data-rm]').forEach(b => b.onclick = async () => {
     if (!confirm('Remove ' + b.dataset.rm + '?')) return;
     b.disabled = true;
-    const { job } = await api('/api/libs/uninstall', { name: b.dataset.rm });
-    await followJob(job);
+    showConsole('out');
+    await streamApi('/api/lib/uninstall', { name: b.dataset.rm }, (evt) => {
+      if (evt.line) logOut(evt.line, clsFor(evt.t));
+    });
     loadInstalled();
   });
   $$('#libresults [data-inc]').forEach(b => b.onclick = () => {
@@ -3792,8 +3791,9 @@ $('#btn-clean').onclick = () => {
 };
 $('#btn-update').onclick = async () => {
   showConsole('out');
-  const { job } = await api('/api/setup', { step: 'update' });
-  await followJob(job);
+  await streamApi('/api/setup', {}, (evt) => {
+    if (evt.line) logOut(evt.line, clsFor(evt.t));
+  });
   await checkHealth();
   toast('Core and index updated');
 };
@@ -3802,10 +3802,10 @@ $('#btn-erase').onclick = async () => {
       'saved settings and files all go away.')) return;
   showConsole('out');
   try {
-    const { job } = await api('/api/erase', { port: SET.port });
-    const res = await followJob(job);
-    toast(res.status === 'ok' ? 'Flash erased' : 'Erase failed, see Output',
-          res.status === 'ok' ? 'good' : 'bad');
+    const res = await streamApi('/api/erase', { port: SET.port }, (evt) => {
+      if (evt.line) logOut(evt.line, clsFor(evt.t));
+    });
+    toast(res.ok ? 'Flash erased' : 'Erase failed, see Output', res.ok ? 'good' : 'bad');
   } catch (e) { toast(e.message, 'bad'); }
 };
 $('#cb-ghost').onchange = e => {
@@ -3983,10 +3983,8 @@ async function boot() {
   paintProblems();
   drawPins();
   await checkHealth();
-  if (ONLINE) {
-    try { SET = await api('/api/settings'); } catch (e) { SET = {}; }
-    $('#sel-baud').value = String(SET.baud || 115200);
-  }
+  try { SET = JSON.parse(localStorage.getItem('forge32-settings') || '{}'); } catch (e) { SET = {}; }
+  $('#sel-baud').value = String(SET.baud || 115200);
   SET.fqbn = SET.fqbn || 'esp32:esp32:esp32';
   SET.options = SET.options || {};
   await loadBoards();
@@ -4010,7 +4008,6 @@ async function boot() {
       }
     }
     setInterval(loadPorts, 6000);
-    startSerialStream();
   } else {
     St.sketch = null;
     St.files = { 'sketch.ino': DEMO };
@@ -4018,10 +4015,10 @@ async function boot() {
     loadSketchList();
   }
   logOut('ESP32 Studio ready.' + (ONLINE ? '' :
-    ' Editor only, since the local helper is not running.'), 'note');
+    ' Editor only, the backend did not answer.'), 'note');
   if (ONLINE && HEALTH.cliVersion)
     logOut('arduino-cli ' + HEALTH.cliVersion +
-      (HEALTH.esp32Core ? ', esp32 core ' + HEALTH.esp32Core :
+      (HEALTH.esp32Version ? ', esp32 core ' + HEALTH.esp32Version :
         ', esp32 core not installed'), 'note');
   setStatus('ready');
   ta.focus();
