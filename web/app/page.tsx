@@ -44,6 +44,19 @@ const TARGETS: Record<Key, { label: string; sub: string; href: string; file: str
   win: { label: 'Download for Windows', sub: '64-bit · .exe installer', href: '/win', file: 'FORGE32-win-x64.exe' },
 };
 
+/* One control picks the platform, so there is one URL on this page, not
+   three. Left to right across the dial: Apple silicon, Intel, Windows. */
+const PLATFORM_ORDER: Key[] = ['mac-arm', 'mac-intel', 'win'];
+
+const KNOB_ANGLE: Record<Key, string> = { 'mac-arm': '-32deg', 'mac-intel': '0deg', win: '32deg' };
+
+/* how far round the lit arc reaches for each position, 148deg being empty */
+const RING_STOP: Record<Key, string> = { 'mac-arm': '30%', 'mac-intel': '50%', win: '70%' };
+
+const LCD_CODE: Record<Key, string> = { 'mac-arm': 'ARM64', 'mac-intel': 'INTEL', win: 'WIN64' };
+
+const TICK_LABEL: Record<Key, string> = { 'mac-arm': 'Apple silicon', 'mac-intel': 'Intel', win: 'Windows' };
+
 function detect(): Key | null {
   if (typeof navigator === 'undefined') return null;
   const ua = navigator.userAgent;
@@ -58,6 +71,7 @@ function mb(bytes?: number) {
 
 export default function Page() {
   const [target, setTarget] = useState<Key | null>(null);
+  const [manual, setManual] = useState<Key | null>(null);
   const [shown, setShown] = useState(0);
   const [rel, setRel] = useState<{ tag?: string; sizes: Record<string, number> }>({ sizes: {} });
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -113,8 +127,9 @@ export default function Page() {
 
   const done = shown >= LOG.length;
   const armed = shown >= ARMED_AT;
-  const t = target ? TARGETS[target] : null;
-  const size = useMemo(() => (t ? mb(rel.sizes[t.file]) : ''), [t, rel]);
+  const selected: Key = manual ?? target ?? 'mac-arm';
+  const sel = TARGETS[selected];
+  const size = useMemo(() => mb(rel.sizes[sel.file]), [sel, rel]);
 
   return (
     <div className="wrap">
@@ -187,46 +202,57 @@ export default function Page() {
 
           <div className="cta-zone">
             <div className="cta-row">
-            {t ? (
-              <a className={armed ? 'cta armed' : 'cta'} href={t.href}>
+              <a className={armed ? 'cta armed' : 'cta'} href={sel.href}>
                 <span className="sw" aria-hidden="true">
                   <i />
                 </span>
                 <span className="cta-text">
-                  <span className="cta-main">{t.label}</span>
+                  <span className="cta-main">{sel.label}</span>
                   <span className="cta-sub">
-                    {t.sub}
+                    {sel.sub}
                     {size ? ` · ${size}` : ''}
                   </span>
                 </span>
               </a>
-            ) : (
-              <a className={armed ? 'cta armed' : 'cta'} href="/mac">
-                <span className="sw" aria-hidden="true">
-                  <i />
-                </span>
-                <span className="cta-text">
-                  <span className="cta-main">Pick your download</span>
-                  <span className="cta-sub">macOS and Windows builds below</span>
-                </span>
-              </a>
-            )}
 
-            <span className="usbc" aria-hidden="true" />
+              <span className="usbc" aria-hidden="true" />
+              <span className="grille" aria-hidden="true" />
             </div>
 
-            <nav className="alts">
-              <span className="silk">All builds</span>
-              <a href="/mac" data-here={target === 'mac-arm' ? '1' : '0'}>
-                macOS Apple silicon
-              </a>
-              <a href="/mac/intel" data-here={target === 'mac-intel' ? '1' : '0'}>
-                macOS Intel
-              </a>
-              <a href="/win" data-here={target === 'win' ? '1' : '0'}>
-                Windows 64-bit
-              </a>
-            </nav>
+            {/* One URL, one control: turn the dial to pick a platform, the
+                switch above always downloads whatever it points at. */}
+            <div className="picker" role="radiogroup" aria-label="Choose your platform">
+              <span
+                className="picker-knob-ring"
+                aria-hidden="true"
+                style={{ '--ring': RING_STOP[selected] } as any}
+              >
+                <span className="picker-knob" style={{ '--angle': KNOB_ANGLE[selected] } as any}>
+                  <i />
+                </span>
+              </span>
+
+              <span className="picker-lcd" aria-hidden="true">
+                <span className="picker-lcd-label">Target</span>
+                <span className="picker-lcd-value">{LCD_CODE[selected]}</span>
+              </span>
+
+              <span className="picker-ticks">
+                {PLATFORM_ORDER.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected === k}
+                    className={selected === k ? 'tick on' : 'tick'}
+                    onClick={() => setManual(k)}
+                  >
+                    <i aria-hidden="true" />
+                    {TICK_LABEL[k]}
+                  </button>
+                ))}
+              </span>
+            </div>
           </div>
 
           {/* A genuine sequence, so the arrows between steps mean something. */}

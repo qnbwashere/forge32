@@ -92,6 +92,14 @@ a { color: inherit; }
   background:
     linear-gradient(200deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 12%),
     linear-gradient(135deg, #17323080 0%, transparent 45%),
+    /* faint concentric ripples, like rings machined into the panel */
+    repeating-radial-gradient(
+      circle at 74% 18%,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 26px
+    ),
     linear-gradient(160deg, #1a2f31 0%, #132225 45%, #0e1a1d 100%);
   background-color: #142428;
   isolation: isolate;
@@ -519,25 +527,169 @@ a { color: inherit; }
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9), inset 0 -0.5px 0 rgba(255, 255, 255, 0.05);
 }
 
-.alts {
+/* a small perforated grille, the kind a speaker sits behind */
+.grille {
+  width: 26px;
+  height: 30px;
+  flex: none;
+  border-radius: 3px;
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.12) 1px, transparent 1.3px) 0 0/6px 6px,
+    linear-gradient(160deg, #1c262e 0%, #101820 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.7),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+@media (max-width: 760px) {
+  .grille { display: none; }
+}
+
+/* --- the platform picker: one dial, one LCD readout, one download -------
+   Turning the knob (by clicking a tick) is the only way to change what the
+   switch above downloads, so the page never needs a second URL. */
+
+.picker {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* the ring: a lit arc that tracks the needle, like a pedal's indicator light */
+.picker-knob-ring {
+  --ring: 50%;
+  width: 62px;
+  height: 62px;
+  flex: none;
+  position: relative;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(
+    from 148deg,
+    var(--pad-hi) 0%,
+    var(--pad-hi) var(--ring),
+    rgba(217, 164, 65, 0.12) var(--ring)
+  );
+  box-shadow: 0 0 12px -2px rgba(217, 164, 65, 0.45);
+}
+
+.picker-knob {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  position: relative;
+  background:
+    radial-gradient(circle at 30% 26%, #f2f4f6 0%, #d7dde1 22%, #a9b2b9 55%, #767f86 100%),
+    repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.09) 0deg 2deg, rgba(0, 0, 0, 0.06) 2deg 4deg);
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.55),
+    inset 0.5px 0.5px 1.5px rgba(255, 255, 255, 0.75),
+    inset -1.5px -1.5px 2.5px rgba(0, 0, 0, 0.45),
+    0 0 0 3px #0c1116;
+}
+
+.picker-knob i {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 2.5px;
+  height: 14px;
+  border-radius: 1.5px;
+  background: linear-gradient(180deg, #2a2f33, #10141a);
+  transform-origin: 50% 19px;
+  transform: translateX(-50%) rotate(var(--angle));
+  box-shadow: 0 0 4px rgba(217, 164, 65, 0.6);
+  transition: transform 0.2s ease;
+}
+
+.picker-lcd {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 10px;
+  min-width: 64px;
+  border-radius: 4px;
+  background: #060907;
+  box-shadow:
+    inset 0 4px 8px -2px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 1px #000,
+    0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.picker-lcd-label {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 8.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #4d6b57;
+}
+
+.picker-lcd-value {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: #9fe6b8;
+  text-shadow: 0 0 8px rgba(120, 220, 160, 0.55);
+}
+
+.picker-ticks {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 20px;
-  margin-top: 18px;
-  align-items: center;
+  gap: 8px;
 }
 
-.alts a {
-  font-size: 12px;
+.tick {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
   color: var(--silk-2);
-  text-decoration: none;
-  border-bottom: 1px solid var(--trace);
-  padding-bottom: 1px;
-  transition: color 0.15s, border-color 0.15s;
+  background: linear-gradient(160deg, #1c2530 0%, #131a21 100%);
+  border: none;
+  border-radius: 20px;
+  padding: 6px 12px 6px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+  transition: color 0.15s, box-shadow 0.15s;
 }
 
-.alts a:hover { color: var(--pad); border-color: var(--pad); }
-.alts a[data-here='1'] { color: var(--silk); }
+.tick i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: radial-gradient(circle at 32% 28%, #6b757c 0%, #3c444a 70%);
+  box-shadow: inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.25);
+}
+
+.tick:hover { color: var(--silk); }
+
+.tick.on {
+  color: var(--silk);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
+    0 0 0 1px var(--pad),
+    0 0 10px -2px rgba(217, 164, 65, 0.6);
+}
+
+.tick.on i {
+  background: radial-gradient(circle at 32% 28%, #fff6db 0%, var(--pad-hi) 40%, var(--pad) 100%);
+  box-shadow: 0 0 5px rgba(240, 196, 105, 0.85), inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.7);
+}
 
 /* --- pipeline: a real sequence, so the arrows carry meaning --------------- */
 
