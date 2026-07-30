@@ -14,9 +14,9 @@
    epoxy, the accents are ENIG gold, the labels are silkscreen.
    ------------------------------------------------------------------ */
 :root{
-  --mask:#0A1210; --panel:#101A17; --panel2:#14211D; --trace:#1C2F29;
-  --trace2:#26443A; --gold:#E3B457; --pad:#B98A2E; --flux:#E6EFE9;
-  --muted:#7C948C; --dim:#546962;
+  --mask:#15171a; --panel:#1b1d21; --panel2:#212429; --trace:#2c2f34;
+  --trace2:#3a3e44; --gold:#E3B457; --pad:#B98A2E; --flux:#E6EFE9;
+  --muted:#8b939a; --dim:#5c6570;
   --hot:#E4563C; --ok:#46C98B; --wire:#62B6D8; --violet:#B18AD6;
   --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
   --cond:'IBM Plex Sans Condensed','Roboto Condensed',system-ui,sans-serif;
@@ -55,7 +55,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- edge connector rail (signature) ---------- */
 #rail{
-  grid-area:rail; background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);
+  grid-area:rail; background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);
   border-right:1px solid var(--trace);
   display:flex; flex-direction:column; align-items:center; gap:2px;
   padding:7px 0; position:relative;
@@ -68,7 +68,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 .led{
   width:9px;height:9px;border-radius:50%;margin:5px 0;
-  background:radial-gradient(circle at 32% 28%,#1a3229 0%,#0d1a15 70%);
+  background:radial-gradient(circle at 32% 28%,#24272b 0%,#15171a 70%);
   box-shadow:inset 0 1px 1.5px rgba(0,0,0,.7),inset 0 -0.5px 0 rgba(255,255,255,.03),
     0 0.5px 0 rgba(255,255,255,.04);
   transition:background .12s, box-shadow .12s;
@@ -91,7 +91,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- top bar ---------- */
 #top{
-  grid-area:top; background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);
+  grid-area:top; background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);
   border-bottom:1px solid var(--trace);
   display:flex; align-items:center; gap:10px; padding:0 10px 0 12px;
 }
@@ -143,7 +143,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- sidebar ---------- */
 #side{
-  grid-area:side; background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%); border-right:1px solid var(--trace);
+  grid-area:side; background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%); border-right:1px solid var(--trace);
   overflow-y:auto; display:flex; flex-direction:column;
 }
 .sect{border-bottom:1px solid var(--trace)}
@@ -166,7 +166,7 @@ button,input,select,textarea{font:inherit;color:inherit}
   border:1px solid transparent;
 }
 .row:hover{background:var(--panel2);color:var(--flux)}
-.row.sel{background:#182a23;color:var(--gold);border-color:var(--trace2)}
+.row.sel{background:#23262b;color:var(--gold);border-color:var(--trace2)}
 .row .dot{width:5px;height:5px;border-radius:50%;background:var(--trace2);
   flex:none}
 .row.sel .dot{background:var(--gold)}
@@ -181,7 +181,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 #main{grid-area:main;display:flex;flex-direction:column;min-width:0;
   background:var(--mask)}
 #tabs{
-  display:flex;align-items:stretch;background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);
+  display:flex;align-items:stretch;background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);
   border-bottom:1px solid var(--trace);overflow-x:auto;flex:none;height:31px;
   scrollbar-width:none;
 }
@@ -222,7 +222,7 @@ button,input,select,textarea{font:inherit;color:inherit}
   white-space:pre;tab-size:2;
 }
 #hl{position:relative;pointer-events:none;color:var(--flux)}
-#ghost{position:absolute;inset:0;pointer-events:none;color:#4e6660;
+#ghost{position:absolute;inset:0;pointer-events:none;color:#5c6570;
   z-index:1}
 #ghost i{font-style:normal;background:rgba(227,180,87,.05);
   border-radius:2px;padding:0 1px 1px 0}
@@ -257,7 +257,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* ---------- autocomplete ---------- */
 #ac{
   position:absolute;z-index:40;display:none;
-  background:#0D1714;border:1px solid var(--trace2);border-radius:4px;
+  background:#17191c;border:1px solid var(--trace2);border-radius:4px;
   box-shadow:0 14px 34px rgba(0,0,0,.6);overflow:hidden;
   width:430px;max-width:calc(100vw - 40px);
 }
@@ -267,7 +267,7 @@ button,input,select,textarea{font:inherit;color:inherit}
   font-family:var(--mono);font-size:12px;color:var(--muted);
   border-left:2px solid transparent;
 }
-.ai.sel{background:#182a23;color:var(--flux);border-left-color:var(--gold)}
+.ai.sel{background:#23262b;color:var(--flux);border-left-color:var(--gold)}
 .ai .kind{
   font-family:var(--cond);font-size:8.5px;letter-spacing:.1em;
   text-transform:uppercase;padding:1px 4px;border-radius:2px;flex:none;
@@ -287,12 +287,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 #acdoc{
   border-top:1px solid var(--trace);padding:7px 10px;font-size:11.5px;
   color:var(--muted);line-height:1.5;max-height:96px;overflow-y:auto;
-  background:#0A1310;
+  background:#121316;
 }
 #acdoc code{font-family:var(--mono);color:var(--gold);font-size:11px}
 #acdoc .ret{color:var(--wire);font-family:var(--mono);font-size:11px}
 #sighelp{
-  position:absolute;z-index:39;display:none;background:#0D1714;
+  position:absolute;z-index:39;display:none;background:#17191c;
   border:1px solid var(--trace2);border-radius:4px;padding:5px 9px;
   font-family:var(--mono);font-size:11.5px;color:var(--muted);
   box-shadow:0 8px 22px rgba(0,0,0,.55);max-width:520px;
@@ -303,7 +303,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- inspector ---------- */
 #insp{
-  grid-area:insp;background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);border-left:1px solid var(--trace);
+  grid-area:insp;background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);border-left:1px solid var(--trace);
   display:flex;flex-direction:column;min-width:0;
 }
 #insptabs{display:flex;border-bottom:1px solid var(--trace);flex:none}
@@ -320,7 +320,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* pinout, the signature element */
 #board{
   border:1px solid var(--trace2);border-radius:6px;
-  background:linear-gradient(160deg,#132420 0%,#0C1614 55%,#08110f 100%);
+  background:linear-gradient(160deg,#24272b 0%,#17191c 55%,#111214 100%);
   padding:9px 0;position:relative;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset -1px -1px 0 rgba(0,0,0,.35);
 }
@@ -339,7 +339,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 #pins .col.right .pin{flex-direction:row-reverse}
 .pin:hover{background:#17272120}
 .pin .pad{width:9px;height:9px;border:1.5px solid var(--pad);border-radius:2px;
-  flex:none;background:#0d1a15;
+  flex:none;background:#15171a;
   box-shadow:inset 0 1px 1.5px rgba(0,0,0,.6),inset 0 -0.5px 0 rgba(255,255,255,.03)}
 .pin .n{min-width:30px}
 .pin.used{color:var(--gold)}
@@ -380,7 +380,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .search input:focus{outline:none;border-color:var(--pad)}
 .card{
   border:1px solid var(--trace);border-radius:4px;padding:8px 9px;
-  margin-bottom:6px;background:#0C1614;
+  margin-bottom:6px;background:#17191c;
 }
 .card h5{margin:0 0 3px;font-family:var(--mono);font-size:12px;
   color:var(--flux);font-weight:600;display:flex;gap:6px;align-items:baseline}
@@ -401,7 +401,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .snipgrid{display:flex;flex-direction:column;gap:4px}
 .snip{
   border:1px solid var(--trace);border-radius:4px;padding:7px 9px;
-  cursor:pointer;background:#0C1614;
+  cursor:pointer;background:#17191c;
 }
 .snip:hover{border-color:var(--pad)}
 .snip b{display:block;font-family:var(--mono);font-size:11.5px;
@@ -417,7 +417,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* ---------- console ---------- */
 #console{
   flex:none;height:210px;display:flex;flex-direction:column;
-  border-top:1px solid var(--trace);background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);min-height:26px;
+  border-top:1px solid var(--trace);background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);min-height:26px;
 }
 #drag{height:4px;cursor:row-resize;background:transparent;margin-top:-4px;
   position:relative;z-index:5}
@@ -477,13 +477,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* plotter */
 #plot{flex:none;height:0;overflow:hidden;border-top:1px solid var(--trace);
-  background:#0A1310;transition:height .15s}
+  background:#121316;transition:height .15s}
 #plot.on{height:118px}
 #plotcv{display:block;width:100%;height:118px}
 
 /* ---------- status ---------- */
 #status{
-  grid-area:status;background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);border-top:1px solid var(--trace);
+  grid-area:status;background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);border-top:1px solid var(--trace);
   display:flex;align-items:center;gap:0;font-family:var(--mono);font-size:10.5px;
   color:var(--muted);padding:0;overflow:hidden;
 }
@@ -511,7 +511,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 #modal.on{display:grid}
 #mcard{
-  background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);border:1px solid var(--trace2);border-radius:6px;
+  background:linear-gradient(165deg,#24272b 0%,var(--panel) 45%,#111214 100%);border:1px solid var(--trace2);border-radius:6px;
   width:min(600px,100%);max-height:86vh;overflow-y:auto;
   box-shadow:0 26px 60px rgba(0,0,0,.65);
 }
@@ -555,7 +555,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 #banner .grow{flex:1}
 #find{
   position:absolute;top:6px;right:26px;z-index:35;display:none;
-  background:#0D1714;border:1px solid var(--trace2);border-radius:4px;
+  background:#17191c;border:1px solid var(--trace2);border-radius:4px;
   padding:5px 6px;gap:5px;align-items:center;
   box-shadow:0 8px 20px rgba(0,0,0,.5);
 }
@@ -3552,7 +3552,7 @@ function drawPlot() {
   const pad = (hi - lo) * 0.12;
   lo -= pad; hi += pad;
   g.strokeStyle = '#1C2F29'; g.lineWidth = 1 * dpr;
-  g.font = (9 * dpr) + 'px monospace'; g.fillStyle = '#546962';
+  g.font = (9 * dpr) + 'px monospace'; g.fillStyle = '#5c6570';
   for (let i = 0; i <= 3; i++) {
     const y = H * i / 3;
     g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
