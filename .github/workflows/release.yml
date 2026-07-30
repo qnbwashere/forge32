@@ -6,6 +6,11 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag to publish (used only for a manual run, e.g. v1.0.0)'
+        required: true
+        default: v1.0.0
 
 permissions:
   contents: write
@@ -70,8 +75,8 @@ jobs:
       - name: Publish to release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name != 'main' && github.ref_name || 'nightly' }}
-          name: FORGE32 ${{ github.ref_name }}
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          name: FORGE32 ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
           draft: false
           prerelease: false
           fail_on_unmatched_files: false
