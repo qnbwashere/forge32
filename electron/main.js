@@ -12,7 +12,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const net = require('node:net');
 const http = require('node:http');
+const https = require('node:https');
 const { fork } = require('node:child_process');
+const { autoUpdater } = require('electron-updater');
 
 const PACKAGED = app.isPackaged;
 const RES = PACKAGED ? process.resourcesPath : path.join(__dirname, '..');
@@ -110,6 +112,119 @@ function stopServer() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Auto-update.
+ *
+ * Primary path: electron-updater, pointed at GitHub releases via the
+ * `publish` block in electron-builder.yml. This is the real silent
+ * updater (NSIS on Windows, Squirrel.Mac on macOS) and works reliably on
+ * Windows even unsigned. On macOS, Squirrel.Mac's silent update is only
+ * reliable for signed/notarized apps; this build is ad hoc signed only,
+ * so treat it as best effort there, not a guarantee.
+ *
+ * Fallback path: a plain HTTPS GET against the GitHub releases API,
+ * compared against app.getVersion(). This runs regardless of whether the
+ * primary path found anything, purely so the user is never left in the
+ * dark if the silent path silently fails to find/apply an update on an
+ * unsigned mac build. It only ever shows a "here's the direct download"
+ * dialog -- it never downloads or installs anything itself.
+ */
+
+let fallbackCheckDone = false;
+
+function compareVersions(a, b) {
+  const pa = a.replace(/^v/, '').split('.').map(Number);
+  const pb = b.replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0, nb = pb[i] || 0;
+    if (na !== nb) return na - nb;
+  }
+  return 0;
+}
+
+function checkForUpdatesFallback() {
+  if (fallbackCheckDone) return;
+  fallbackCheckDone = true;
+  const req = https.get(
+    {
+      host: 'api.github.com',
+      path: '/repos/qnbwashere/forge32/releases/latest',
+      headers: { 'User-Agent': 'FORGE32-updater' },
+      timeout: 8000,
+    },
+    (res) => {
+      let data = '';
+      res.on('data', (d) => (data += d));
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          const latest = String(json.tag_name || '').trim();
+          if (!latest) return;
+          if (compareVersions(latest, app.getVersion()) > 0) {
+            const url = json.html_url || 'https://github.com/qnbwashere/forge32/releases/latest';
+            dialog.showMessageBox(win, {
+              type: 'info',
+              title: 'FORGE32 update available',
+              message: `FORGE32 ${latest} is available (you have ${app.getVersion()}).`,
+              detail: 'Automatic updates on this platform may not have applied yet. Click Download to get it directly.',
+              buttons: ['Download', 'Later'],
+              defaultId: 0,
+              cancelId: 1,
+            }).then((r) => {
+              if (r.response === 0) shell.openExternal(url);
+            });
+          }
+        } catch { /* malformed response, ignore */ }
+      });
+    }
+  );
+  req.on('timeout', () => req.destroy());
+  req.on('error', () => { /* offline or blocked, ignore */ });
+}
+
+function checkForUpdates() {
+  if (!app.isPackaged) return; // dev runs have no publish feed to check
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-downloaded', () => {
+    fallbackCheckDone = true; // the real updater clearly worked, skip the fallback nag
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'FORGE32 update ready',
+      message: 'A new version of FORGE32 has been downloaded.',
+      detail: 'Restart now to install it, or it will install the next time you quit.',
+      buttons: ['Restart now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then((r) => {
+      if (r.response === 0) {
+        app.isQuitting = true;
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+
+  autoUpdater.on('error', () => {
+    // silent path failed (common on an unsigned mac build) -- fall back
+    // to a manual notification so the user still finds out.
+    checkForUpdatesFallback();
+  });
+
+  try {
+    autoUpdater.checkForUpdates();
+  } catch {
+    checkForUpdatesFallback();
+  }
+
+  // Insurance: run the fallback check unconditionally a bit later too, in
+  // case the primary updater neither errors nor finds anything wrong but
+  // also never actually applies (observed Squirrel.Mac behavior on
+  // unsigned builds). checkForUpdatesFallback() is idempotent per launch.
+  setTimeout(checkForUpdatesFallback, 15000);
+}
+
+/* ---------------------------------------------------------------- */
 
 function menu() {
   const mac = process.platform === 'darwin';
@@ -182,6 +297,7 @@ if (!app.requestSingleInstanceLock()) {
       await waitForServer(port);
       menu();
       await createWindow();
+      checkForUpdates();
     } catch (err) {
       dialog.showErrorBox('FORGE32 could not start', String(err && err.message ? err.message : err));
       app.quit();

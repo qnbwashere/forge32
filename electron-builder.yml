@@ -36,9 +36,17 @@ mac:
   # matches. Listing both archs here made every job build both, back to
   # back in the same process, which reliably broke dmgbuild's staging
   # volume on the second dmg (same title, same background file path).
+  #
+  # zip sits alongside dmg because that is the payload electron-updater's
+  # Squirrel.Mac actually installs; it never gets linked to directly, so it
+  # keeps electron-builder's normal versioned name instead of the dmg's
+  # permanent one. Note that silent, automatic updates on macOS need a
+  # signed app to be reliable, and this one is ad hoc signed only (see
+  # SETUP.md), so treat the in-app update check as best effort there, not
+  # a promise.
   target:
     - dmg
-  artifactName: FORGE32-mac-${arch}.${ext}
+    - zip
   category: public.app-category.developer-tools
   darkModeSupport: true
   # Ad hoc signature. Enough to launch; see SETUP.md for real notarization.
@@ -75,4 +83,6 @@ nsis:
 
 publish:
   provider: github
+  owner: qnbwashere
+  repo: forge32
   releaseType: release

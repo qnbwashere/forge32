@@ -51,6 +51,24 @@ links.
    Test in a browser after any edit here: open the sketch, type to trigger
    autocomplete, switch console tabs, click a pin. All of it should still
    work exactly as before, just look different.
+8. **`app/public/index.html`'s frontend and `app/server.js`'s routes are a
+   contract.** The IDE talks to the backend through one ndjson streaming
+   protocol (see `streamApi()` in the script, `openStream()` on the
+   server): every long running action -- setup, compile, upload, lib
+   install/uninstall, erase, monitor -- POSTs once and reads a stream of
+   `{t: ...}` events off the response body. There is no job-id/EventSource
+   model anywhere in this app; don't reintroduce one. If you add a new
+   backend route or change a response shape, grep the other side and
+   update it in the same change, then actually exercise it (curl or a
+   headless browser), because a mismatch here fails silently until a user
+   clicks the button.
+9. **`package.json`'s `"version"` must be bumped for every release, and it
+   is the only version number that matters.** electron-builder generates
+   `latest.yml` / `latest-mac.yml` (the files electron-updater polls) from
+   this field, not from the git tag. Tagging `v1.0.3` while `package.json`
+   still says `1.0.2` ships an installer that electron-updater considers
+   identical to the last one -- it will never offer itself as an update.
+   Always bump this in the same commit that prepares a release.
 
 ## Running locally
 
@@ -103,6 +121,35 @@ npm run dev       # next dev
    `/win`. Load the site itself and confirm the version tag and file size
    render, which means the client side call to the GitHub releases API is
    working.
+
+## Auto-update
+
+`electron/main.js` runs `checkForUpdates()` once, right after the main
+window opens (packaged builds only; dev runs skip it). Two paths, in order:
+
+1. **`electron-updater`**, configured against the `publish` block in
+   `electron-builder.yml` (GitHub releases, owner/repo `qnbwashere/forge32`).
+   This is a real silent updater: it downloads the new installer in the
+   background and, once ready, asks the user to restart. On Windows this
+   works unsigned. On macOS, Squirrel.Mac's silent apply is only reliable
+   for a signed/notarized app, and FORGE32 currently ships ad hoc signed
+   only (see SETUP.md) -- so on macOS this path is best effort, not a
+   promise, until real notarization is set up.
+2. **A plain HTTPS fallback** (`checkForUpdatesFallback()`), hitting
+   `api.github.com/repos/qnbwashere/forge32/releases/latest` directly with
+   Node's built-in `https`, comparing `tag_name` against `app.getVersion()`.
+   This never downloads or installs anything -- it only shows a "new
+   version available, click to download" dialog with a direct link. It
+   fires if `electron-updater` errors, and also unconditionally ~15s after
+   launch as insurance, specifically to cover the case where the silent
+   path on an unsigned mac build neither errors nor actually applies. It is
+   idempotent per launch (`fallbackCheckDone`), and is skipped entirely if
+   the silent path already got as far as downloading an update.
+
+Anyone currently on a build from before this feature shipped (v1.0.2 or
+earlier without it) has no updater code at all and must reinstall once by
+hand. Every release after that should update itself on Windows, and should
+at minimum notify-with-a-link on macOS even in the worst case.
 
 ## The design system in `globals.css`
 
