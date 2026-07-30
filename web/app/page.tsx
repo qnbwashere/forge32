@@ -45,17 +45,13 @@ const TARGETS: Record<Key, { label: string; sub: string; href: string; file: str
 };
 
 /* One control picks the platform, so there is one URL on this page, not
-   three. Left to right across the dial: Apple silicon, Intel, Windows. */
-const PLATFORM_ORDER: Key[] = ['mac-arm', 'mac-intel', 'win'];
+   three: the two flanking knobs and the small toggle above them all just
+   turn the big knob in the middle, which is the only link. */
+const KNOB_ANGLE: Record<Key, string> = { 'mac-arm': '-28deg', 'mac-intel': '0deg', win: '28deg' };
 
-const KNOB_ANGLE: Record<Key, string> = { 'mac-arm': '-32deg', 'mac-intel': '0deg', win: '32deg' };
-
-/* how far round the lit arc reaches for each position, 148deg being empty */
-const RING_STOP: Record<Key, string> = { 'mac-arm': '30%', 'mac-intel': '50%', win: '70%' };
+const RING_STOP: Record<Key, string> = { 'mac-arm': '32%', 'mac-intel': '50%', win: '68%' };
 
 const LCD_CODE: Record<Key, string> = { 'mac-arm': 'ARM64', 'mac-intel': 'INTEL', win: 'WIN64' };
-
-const TICK_LABEL: Record<Key, string> = { 'mac-arm': 'Apple silicon', 'mac-intel': 'Intel', win: 'Windows' };
 
 function detect(): Key | null {
   if (typeof navigator === 'undefined') return null;
@@ -134,24 +130,19 @@ export default function Page() {
   return (
     <div className="wrap">
       <div className="board">
-        <span className="hole tl" aria-hidden="true" />
-        <span className="hole tr" aria-hidden="true" />
-        <span className="hole bl" aria-hidden="true" />
-        <span className="hole br" aria-hidden="true" />
-        <span className="cap" aria-hidden="true" />
+        <span className="panel-screw tl" aria-hidden="true" />
+        <span className="panel-screw tr" aria-hidden="true" />
+        <span className="panel-screw bl" aria-hidden="true" />
+        <span className="panel-screw br" aria-hidden="true" />
 
-        <svg
-          className="traces"
-          aria-hidden="true"
-          width="100%"
-          height="100%"
-          viewBox="0 0 400 700"
-          preserveAspectRatio="none"
-        >
-          <polyline points="88,132 62,132 62,190 38,214" fill="none" stroke="#8a5a2e" strokeWidth="1.5" />
-          <polyline points="88,236 72,236 72,274 98,300" fill="none" stroke="#8a5a2e" strokeWidth="1.5" />
-          <polyline points="88,338 56,338 56,378" fill="none" stroke="#8a5a2e" strokeWidth="1.5" />
-        </svg>
+        <span className="side-vent left" aria-hidden="true">
+          <span className="vent-grille" />
+          <span className="vent-glow" />
+        </span>
+        <span className="side-vent right" aria-hidden="true">
+          <span className="vent-grille" />
+          <span className="vent-glow" />
+        </span>
 
         <div className="board-grid">
         <aside className="rail" aria-hidden="true">
@@ -200,58 +191,71 @@ export default function Page() {
             </div>
           </section>
 
-          <div className="cta-zone">
-            <div className="cta-row">
-              <a className={armed ? 'cta armed' : 'cta'} href={sel.href}>
-                <span className="sw" aria-hidden="true">
+          {/* The control panel. One URL: the big knob in the middle is the
+              only link on the page. The small toggle above and the two
+              flanking dials just turn it — same download, same href,
+              whichever one you touch. */}
+          <div className="panel" role="radiogroup" aria-label="Choose your platform">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={selected === 'mac-intel'}
+              aria-label="Intel"
+              className={selected === 'mac-intel' ? 'mini-toggle on' : 'mini-toggle'}
+              onClick={() => setManual('mac-intel')}
+            >
+              <i aria-hidden="true" />
+              <span className="silk">Intel</span>
+            </button>
+
+            <div className="knob-row">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={selected === 'mac-arm'}
+                aria-label="Apple silicon"
+                className={selected === 'mac-arm' ? 'sat-knob on' : 'sat-knob'}
+                onClick={() => setManual('mac-arm')}
+              >
+                <span className="sat-dial" aria-hidden="true">
                   <i />
                 </span>
-                <span className="cta-text">
-                  <span className="cta-main">{sel.label}</span>
-                  <span className="cta-sub">
+                <span className="silk">Apple silicon</span>
+              </button>
+
+              <a className={armed ? 'dl-hero armed' : 'dl-hero'} href={sel.href}>
+                <span
+                  className="dl-ring"
+                  aria-hidden="true"
+                  style={{ '--ring': RING_STOP[selected] } as any}
+                >
+                  <span className="dl-knob" style={{ '--angle': KNOB_ANGLE[selected] } as any}>
+                    <i />
+                  </span>
+                </span>
+                <span className="dl-label">
+                  <span className="silk">Download</span>
+                  <span className="dl-code">{LCD_CODE[selected]}</span>
+                  <span className="dl-sub">
                     {sel.sub}
                     {size ? ` · ${size}` : ''}
                   </span>
                 </span>
               </a>
 
-              <span className="usbc" aria-hidden="true" />
-              <span className="grille" aria-hidden="true" />
-            </div>
-
-            {/* One URL, one control: turn the dial to pick a platform, the
-                switch above always downloads whatever it points at. */}
-            <div className="picker" role="radiogroup" aria-label="Choose your platform">
-              <span
-                className="picker-knob-ring"
-                aria-hidden="true"
-                style={{ '--ring': RING_STOP[selected] } as any}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={selected === 'win'}
+                aria-label="Windows"
+                className={selected === 'win' ? 'sat-knob on' : 'sat-knob'}
+                onClick={() => setManual('win')}
               >
-                <span className="picker-knob" style={{ '--angle': KNOB_ANGLE[selected] } as any}>
+                <span className="sat-dial" aria-hidden="true">
                   <i />
                 </span>
-              </span>
-
-              <span className="picker-lcd" aria-hidden="true">
-                <span className="picker-lcd-label">Target</span>
-                <span className="picker-lcd-value">{LCD_CODE[selected]}</span>
-              </span>
-
-              <span className="picker-ticks">
-                {PLATFORM_ORDER.map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected === k}
-                    className={selected === k ? 'tick on' : 'tick'}
-                    onClick={() => setManual(k)}
-                  >
-                    <i aria-hidden="true" />
-                    {TICK_LABEL[k]}
-                  </button>
-                ))}
-              </span>
+                <span className="silk">Windows</span>
+              </button>
             </div>
           </div>
 

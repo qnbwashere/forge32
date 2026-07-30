@@ -1,16 +1,17 @@
 /* ==========================================================================
    FORGE32 download page
-   A physical PCB resting on an ESD mat, lit from one source: top left.
-   Every highlight, bevel and shadow in this file agrees with that light.
-   Palette taken off a real ESP32-DevKitC: dark soldermask, white silkscreen,
-   gold ENIG pads, and Espressif red kept for one accent only.
+   A hardware control panel resting on a bench mat, lit from one source:
+   top left. Every highlight, bevel and shadow in this file agrees with
+   that light. Brushed graphite chassis, chrome knobs, a warm gold glow
+   for the lit state, a recessed LCD readout, and red kept for one
+   accent only (power).
    ========================================================================== */
 
 :root {
-  --mask:    #10161c;
-  --mask-2:  #151d25;
-  --mask-3:  #1b242e;
-  --trace:   #253442;
+  --mask:    #14161a;
+  --mask-2:  #1a1d21;
+  --mask-3:  #212429;
+  --trace:   #2c2f34;
   --silk:    #e9edf0;
   --silk-2:  #8b99a4;
   --silk-3:  #5d6b76;
@@ -77,7 +78,7 @@ a { color: inherit; }
   text-shadow: 0 -1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 rgba(0, 0, 0, 0.55);
 }
 
-/* --- board frame: the PCB itself, resting on the mat ---------------------- */
+/* --- the chassis: a brushed graphite control panel, resting on the mat --- */
 
 .wrap {
   max-width: 1100px;
@@ -90,18 +91,17 @@ a { color: inherit; }
   border-radius: 18px;
   padding: 0;
   background:
-    linear-gradient(200deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 12%),
-    linear-gradient(135deg, #17323080 0%, transparent 45%),
+    linear-gradient(200deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0) 12%),
     /* faint concentric ripples, like rings machined into the panel */
     repeating-radial-gradient(
       circle at 74% 18%,
-      rgba(255, 255, 255, 0.025) 0px,
-      rgba(255, 255, 255, 0.025) 1px,
+      rgba(255, 255, 255, 0.02) 0px,
+      rgba(255, 255, 255, 0.02) 1px,
       transparent 1px,
       transparent 26px
     ),
-    linear-gradient(160deg, #1a2f31 0%, #132225 45%, #0e1a1d 100%);
-  background-color: #142428;
+    linear-gradient(160deg, #24272b 0%, #1b1d20 45%, #131416 100%);
+  background-color: #1b1d20;
   isolation: isolate;
 
   /* one soft shadow, cast down and to the right onto the mat, plus a hairline
@@ -109,13 +109,13 @@ a { color: inherit; }
   box-shadow:
     16px 30px 52px -12px rgba(0, 0, 0, 0.7),
     5px 10px 16px -4px rgba(0, 0, 0, 0.55),
-    -1px -1px 0 rgba(255, 255, 255, 0.07),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    -1px -1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
     inset -1px -1px 0 rgba(0, 0, 0, 0.55),
-    inset 1px 0 0 rgba(255, 255, 255, 0.05);
+    inset 1px 0 0 rgba(255, 255, 255, 0.04);
 }
 
-/* fine glass-cloth grain across the mask, plus a sheen along the top edge only */
+/* fine brushed-metal grain, plus a sheen along the top edge only */
 .board::before {
   content: '';
   position: absolute;
@@ -124,9 +124,14 @@ a { color: inherit; }
   pointer-events: none;
   z-index: 2;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 6%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  mix-blend-mode: overlay;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 6%),
+    repeating-linear-gradient(
+      98deg,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0) 1px,
+      rgba(0, 0, 0, 0.03) 2px,
+      rgba(255, 255, 255, 0) 3px
+    );
 }
 
 .board-grid {
@@ -138,36 +143,74 @@ a { color: inherit; }
   padding: 30px 34px 34px;
 }
 
-/* --- mounting holes: plated bore with a gold ring, lit upper-left --------- */
+/* --- panel screws: flush metal Phillips heads, lit upper-left ------------- */
 
-.hole {
+.panel-screw {
   position: absolute;
-  width: 22px;
-  height: 22px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   z-index: 3;
-  background: radial-gradient(circle at 50% 50%, #050708 0%, #050708 34%, transparent 35%),
-    conic-gradient(from 225deg, #f0c469, #d9a441 35%, #8a651f 65%, #d9a441 85%, #f0c469 100%);
+  background: radial-gradient(circle at 32% 28%, #eef1f3 0%, #c7ced3 30%, #7d858c 75%, #565c62 100%);
   box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
-    -1px -1px 2px rgba(255, 255, 255, 0.35) inset,
-    1px 1px 2px rgba(0, 0, 0, 0.55) inset,
-    0 1px 2px rgba(0, 0, 0, 0.4);
+    inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.7),
+    inset -1px -1px 1.5px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.panel-screw::before,
+.panel-screw::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 1.4px;
+  background: rgba(30, 34, 38, 0.75);
+  box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.15);
+  transform: translate(-50%, -50%);
+}
+.panel-screw::after { transform: translate(-50%, -50%) rotate(90deg); }
+
+.panel-screw.tl { top: 14px; left: 14px; }
+.panel-screw.tr { top: 14px; right: 14px; }
+.panel-screw.bl { bottom: 14px; left: 14px; }
+.panel-screw.br { bottom: 14px; right: 14px; }
+
+/* --- side vents: perforated grille with a backlit strip beside it -------- */
+
+.side-vent {
+  position: absolute;
+  top: 64px;
+  bottom: 64px;
+  width: 30px;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 5px;
+  opacity: 0.9;
+}
+.side-vent.left { left: 14px; }
+.side-vent.right { right: 14px; flex-direction: row-reverse; }
+
+.vent-grille {
+  flex: 1;
+  border-radius: 3px;
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.1) 1px, transparent 1.3px) 0 0/7px 7px,
+    linear-gradient(160deg, #1e2124 0%, #131518 100%);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7), inset -1px 0 0 rgba(255, 255, 255, 0.03);
 }
 
-.hole.tl { top: 14px; left: 14px; }
-.hole.tr { top: 14px; right: 14px; }
-.hole.bl { bottom: 14px; left: 14px; }
-.hole.br { bottom: 14px; right: 14px; }
+.vent-glow {
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, transparent 0%, var(--pad-hi) 45%, var(--pad) 55%, transparent 100%);
+  box-shadow: 0 0 8px 1px rgba(240, 196, 105, 0.55);
+  opacity: 0.85;
+}
 
-/* --- copper trace hairlines, restrained -------------------------------- */
-
-.traces {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.55;
+@media (max-width: 900px) {
+  .side-vent { display: none; }
 }
 
 /* --- pin rail: domed gold pads ------------------------------------------- */
@@ -394,177 +437,149 @@ a { color: inherit; }
 
 @keyframes blink { 50% { opacity: 0; } }
 
-/* --- the download control: a real tactile switch, the hero element ------- */
+/* --- the control panel: one big knob is the download, two small dials and
+   a toggle beside it just turn it. This is the part built to look like the
+   reference hardware, not a PCB detail bolted onto one. ------------------- */
 
-.cta-zone { margin-top: 38px; }
-
-.cta-row {
+.panel {
+  margin-top: 40px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
 }
 
-.cta {
-  display: inline-flex;
+/* the tiny toggle light above the knobs, like a labelled indicator lamp */
+.mini-toggle {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 20px;
-  padding: 16px 30px 16px 16px;
-  text-decoration: none;
-  border-radius: 10px;
-  background: linear-gradient(150deg, #202a32 0%, #161e25 60%, #10161b 100%);
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.mini-toggle i {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 26%, #eef1f3 0%, #c7ced3 30%, #8b9299 70%, #5c6268 100%);
   box-shadow:
-    0 10px 18px -8px rgba(0, 0, 0, 0.65),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.55);
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.6),
+    inset -1px -1px 1.5px rgba(0, 0, 0, 0.35);
+  position: relative;
+}
+.mini-toggle i::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #1a1d21 0%, #0b0d0f 75%);
+  box-shadow: inset 0.5px 0.5px 1px rgba(0, 0, 0, 0.6);
+}
+.mini-toggle.on i::after {
+  background: radial-gradient(circle at 32% 28%, #fff6db 0%, var(--pad-hi) 45%, var(--pad) 100%);
+  box-shadow: 0 0 6px rgba(240, 196, 105, 0.85), inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.6);
+}
+.mini-toggle .silk { transition: color 0.15s; }
+.mini-toggle.on .silk { color: var(--pad-hi); }
+.mini-toggle:hover .silk { color: var(--silk-2); }
+
+.knob-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
 }
 
-/* the switch body: black plastic, chamfered, mounted on the board */
-.sw {
-  --press: 0px;
-  width: 54px; height: 54px;
-  flex: none;
-  border-radius: 9px;
-  background: linear-gradient(150deg, #23282d 0%, #16191c 60%, #0b0d0f 100%);
+/* --- satellite knobs: smaller dials either side, quick platform picks ---- */
+
+.sat-knob {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.sat-dial {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
+  background: radial-gradient(circle at 50% 50%, #0c0d0f 62%, #1c1f22 100%);
   box-shadow:
-    0 5px 8px rgba(0, 0, 0, 0.55),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.14),
-    inset -1.5px -1.5px 0 rgba(0, 0, 0, 0.65),
-    inset 1.5px 1.5px 0 rgba(255, 255, 255, 0.03);
+    0 3px 6px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 2px #26292d,
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: box-shadow 0.15s ease;
 }
 
-/* the cap: brushed metal dome, specular hotspot upper-left */
-.sw i {
-  width: 30px; height: 30px;
+.sat-dial i {
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   position: relative;
-  transform: translateY(var(--press));
   background:
-    radial-gradient(circle at 30% 26%, #ffffff 0%, #eef1f3 8%, #c7ced3 30%, #9aa3aa 60%, #6c757c 100%),
-    repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.12) 0px, rgba(255, 255, 255, 0) 1px, rgba(0, 0, 0, 0.05) 2px, rgba(255, 255, 255, 0) 3px);
-  background-blend-mode: normal, overlay;
+    radial-gradient(circle at 30% 26%, #fdfdfe 0%, #e5e8ea 20%, #b7bec3 55%, #868d93 100%),
+    repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.08) 0deg 2deg, rgba(0, 0, 0, 0.05) 2deg 4deg);
   box-shadow:
-    0 3px 4px rgba(0, 0, 0, 0.6),
-    inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.7),
-    inset -1px -1px 2px rgba(0, 0, 0, 0.35);
-  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s ease;
+    0 2px 3px rgba(0, 0, 0, 0.5),
+    inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.75),
+    inset -1px -1px 1.5px rgba(0, 0, 0, 0.35);
+}
+.sat-dial i::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 2px;
+  height: 8px;
+  border-radius: 1px;
+  background: #22262a;
+  transform: translateX(-50%);
 }
 
-.cta:hover .sw i {
-  background:
-    radial-gradient(circle at 30% 26%, #ffffff 0%, #f6f8f9 10%, #d3d9dd 32%, #a4adb4 62%, #757f86 100%),
-    repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.14) 0px, rgba(255, 255, 255, 0) 1px, rgba(0, 0, 0, 0.05) 2px, rgba(255, 255, 255, 0) 3px);
-}
+.sat-knob:hover .sat-dial { box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5), inset 0 0 0 2px #33373c, inset 0 1px 0 rgba(255, 255, 255, 0.08); }
 
-.cta.armed .sw {
+.sat-knob.on .sat-dial {
   box-shadow:
-    0 5px 8px rgba(0, 0, 0, 0.55),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.14),
-    inset -1.5px -1.5px 0 rgba(0, 0, 0, 0.65),
-    0 0 0 2px var(--pad),
-    0 0 18px -2px rgba(217, 164, 65, 0.6);
+    0 3px 6px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 2px var(--pad),
+    0 0 14px -2px rgba(217, 164, 65, 0.6);
 }
+.sat-knob .silk { transition: color 0.15s; }
+.sat-knob.on .silk { color: var(--pad-hi); }
+.sat-knob:hover .silk { color: var(--silk-2); }
 
-/* a genuine mechanical press: cap sinks, shadow collapses, hotspot shifts down-right */
-.cta:active .sw {
+/* --- the hero knob: the only link, a real dominant chrome dial ----------- */
+
+.dl-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  padding: 10px 26px;
+  border-radius: 16px;
+  background: linear-gradient(150deg, #232629 0%, #1a1c1f 55%, #121315 100%);
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.5),
-    inset 0 2px 4px rgba(0, 0, 0, 0.65),
+    0 14px 26px -10px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
     inset -1px -1px 0 rgba(0, 0, 0, 0.5);
 }
 
-.cta:active .sw i {
-  --press: 3px;
-  background:
-    radial-gradient(circle at 42% 40%, #e7ebee 0%, #c7ced3 14%, #9aa3aa 40%, #6c757c 75%, #565f66 100%),
-    repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0) 1px, rgba(0, 0, 0, 0.06) 2px, rgba(255, 255, 255, 0) 3px);
-  box-shadow:
-    0 0.5px 1px rgba(0, 0, 0, 0.5),
-    inset 0.5px 0.5px 1px rgba(0, 0, 0, 0.3);
-}
-
-.cta-text { display: flex; flex-direction: column; gap: 3px; }
-
-.cta-main {
-  font-family: var(--cond);
-  font-weight: 700;
-  text-transform: uppercase;
-  font-size: 20px;
-  letter-spacing: 0.03em;
-  line-height: 1.05;
-  color: var(--silk);
-  text-shadow: 0 -1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 rgba(0, 0, 0, 0.55);
-}
-
-.cta-sub {
-  font-size: 11.5px;
-  color: var(--silk-3);
-  letter-spacing: 0.01em;
-}
-
-/* small board detail: recessed USB-C next to the switch, restrained */
-.usbc {
-  width: 30px;
-  height: 13px;
-  border-radius: 7px;
-  flex: none;
-  background: linear-gradient(155deg, #3a4650 0%, #222b32 55%, #12171b 100%);
-  box-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.18),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.55),
-    0 2px 4px rgba(0, 0, 0, 0.5);
-  position: relative;
-}
-.usbc::before {
-  content: '';
-  position: absolute;
-  inset: 3px 6px;
-  border-radius: 4px;
-  background: #05070a;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9), inset 0 -0.5px 0 rgba(255, 255, 255, 0.05);
-}
-
-/* a small perforated grille, the kind a speaker sits behind */
-.grille {
-  width: 26px;
-  height: 30px;
-  flex: none;
-  border-radius: 3px;
-  background:
-    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.12) 1px, transparent 1.3px) 0 0/6px 6px,
-    linear-gradient(160deg, #1c262e 0%, #101820 100%);
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.7),
-    inset -1px -1px 0 rgba(255, 255, 255, 0.04),
-    0 1px 2px rgba(0, 0, 0, 0.35);
-}
-
-@media (max-width: 760px) {
-  .grille { display: none; }
-}
-
-/* --- the platform picker: one dial, one LCD readout, one download -------
-   Turning the knob (by clicking a tick) is the only way to change what the
-   switch above downloads, so the page never needs a second URL. */
-
-.picker {
-  margin-top: 22px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-/* the ring: a lit arc that tracks the needle, like a pedal's indicator light */
-.picker-knob-ring {
+.dl-ring {
   --ring: 50%;
-  width: 62px;
-  height: 62px;
-  flex: none;
-  position: relative;
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -572,123 +587,81 @@ a { color: inherit; }
     from 148deg,
     var(--pad-hi) 0%,
     var(--pad-hi) var(--ring),
-    rgba(217, 164, 65, 0.12) var(--ring)
+    rgba(217, 164, 65, 0.14) var(--ring)
   );
-  box-shadow: 0 0 12px -2px rgba(217, 164, 65, 0.45);
+  box-shadow: 0 0 20px -4px rgba(217, 164, 65, 0.5);
+  transition: box-shadow 0.15s ease;
 }
 
-.picker-knob {
-  width: 50px;
-  height: 50px;
+.dl-knob {
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   position: relative;
   background:
-    radial-gradient(circle at 30% 26%, #f2f4f6 0%, #d7dde1 22%, #a9b2b9 55%, #767f86 100%),
-    repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.09) 0deg 2deg, rgba(0, 0, 0, 0.06) 2deg 4deg);
+    radial-gradient(circle at 30% 26%, #fdfdfe 0%, #eaecee 14%, #ccd2d6 34%, #9aa1a7 66%, #6c737a 100%),
+    repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.1) 0deg 2deg, rgba(0, 0, 0, 0.05) 2deg 4deg);
   box-shadow:
-    0 3px 6px rgba(0, 0, 0, 0.55),
-    inset 0.5px 0.5px 1.5px rgba(255, 255, 255, 0.75),
-    inset -1.5px -1.5px 2.5px rgba(0, 0, 0, 0.45),
-    0 0 0 3px #0c1116;
+    0 4px 8px rgba(0, 0, 0, 0.55),
+    inset 0.5px 0.5px 2px rgba(255, 255, 255, 0.8),
+    inset -2px -2px 3px rgba(0, 0, 0, 0.4),
+    0 0 0 4px #101214;
+  transition: transform 0.06s ease, box-shadow 0.15s ease;
 }
 
-.picker-knob i {
+.dl-knob i {
   position: absolute;
-  top: 6px;
+  top: 9px;
   left: 50%;
-  width: 2.5px;
-  height: 14px;
+  width: 3px;
+  height: 20px;
   border-radius: 1.5px;
-  background: linear-gradient(180deg, #2a2f33, #10141a);
-  transform-origin: 50% 19px;
+  background: linear-gradient(180deg, #2a2f33, #101214);
+  transform-origin: 50% 31px;
   transform: translateX(-50%) rotate(var(--angle));
-  box-shadow: 0 0 4px rgba(217, 164, 65, 0.6);
+  box-shadow: 0 0 5px rgba(217, 164, 65, 0.65);
   transition: transform 0.2s ease;
 }
 
-.picker-lcd {
-  flex: none;
+.dl-hero:hover .dl-knob {
+  background:
+    radial-gradient(circle at 30% 26%, #ffffff 0%, #f1f3f4 14%, #d6dbde 34%, #a5abb1 66%, #767d84 100%),
+    repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.12) 0deg 2deg, rgba(0, 0, 0, 0.05) 2deg 4deg);
+}
+
+.dl-hero.armed .dl-ring { box-shadow: 0 0 26px -2px rgba(217, 164, 65, 0.75); }
+
+/* a genuine mechanical press: the whole knob sinks, shadow collapses */
+.dl-hero:active .dl-knob {
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.5),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.4),
+    0 0 0 4px #101214;
+}
+.dl-hero:active .dl-ring { box-shadow: 0 0 10px -4px rgba(217, 164, 65, 0.4); }
+
+.dl-label {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 5px 10px;
-  min-width: 64px;
-  border-radius: 4px;
-  background: #060907;
-  box-shadow:
-    inset 0 4px 8px -2px rgba(0, 0, 0, 0.9),
-    inset 0 0 0 1px #000,
-    0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-.picker-lcd-label {
-  font-family: var(--cond);
-  font-weight: 600;
-  font-size: 8.5px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #4d6b57;
-}
-
-.picker-lcd-value {
-  font-family: var(--mono);
-  font-weight: 500;
-  font-size: 13px;
-  letter-spacing: 0.06em;
-  color: #9fe6b8;
-  text-shadow: 0 0 8px rgba(120, 220, 160, 0.55);
-}
-
-.picker-ticks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tick {
-  font-family: var(--cond);
-  font-weight: 600;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--silk-2);
-  background: linear-gradient(160deg, #1c2530 0%, #131a21 100%);
-  border: none;
-  border-radius: 20px;
-  padding: 6px 12px 6px 8px;
-  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
-    0 1px 2px rgba(0, 0, 0, 0.4);
-  transition: color 0.15s, box-shadow 0.15s;
+  gap: 2px;
 }
 
-.tick i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex: none;
-  background: radial-gradient(circle at 32% 28%, #6b757c 0%, #3c444a 70%);
-  box-shadow: inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.25);
-}
-
-.tick:hover { color: var(--silk); }
-
-.tick.on {
+.dl-code {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 19px;
+  letter-spacing: 0.04em;
   color: var(--silk);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
-    0 0 0 1px var(--pad),
-    0 0 10px -2px rgba(217, 164, 65, 0.6);
+  text-shadow: 0 -1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 rgba(0, 0, 0, 0.55);
 }
 
-.tick.on i {
-  background: radial-gradient(circle at 32% 28%, #fff6db 0%, var(--pad-hi) 40%, var(--pad) 100%);
-  box-shadow: 0 0 5px rgba(240, 196, 105, 0.85), inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.7);
+.dl-sub {
+  font-size: 11.5px;
+  color: var(--silk-3);
+  letter-spacing: 0.01em;
 }
 
 /* --- pipeline: a real sequence, so the arrows carry meaning --------------- */
@@ -792,44 +765,10 @@ a { color: inherit; }
 .foot a { text-decoration: none; border-bottom: 1px solid var(--trace); }
 .foot a:hover { color: var(--pad); border-color: var(--pad); }
 
-/* --- a lone electrolytic can, tucked near the footer, restrained --------- */
-
-.cap {
-  position: absolute;
-  width: 26px;
-  height: 30px;
-  right: 40px;
-  bottom: 96px;
-  z-index: 1;
-  border-radius: 4px 4px 3px 3px;
-  background:
-    radial-gradient(circle at 28% 14%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 30%),
-    linear-gradient(120deg, #4a5a63 0%, #2c3941 45%, #171f24 100%);
-  box-shadow:
-    0 3px 6px rgba(0, 0, 0, 0.5),
-    inset -2px -2px 3px rgba(0, 0, 0, 0.5),
-    inset 1px 1px 2px rgba(255, 255, 255, 0.15);
-}
-.cap::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 8px;
-  border-radius: 4px 4px 0 0;
-  background: radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%), #384750;
-}
-
-@media (max-width: 900px) {
-  .cap { display: none; }
-}
-
-@media (max-width: 760px) {
-  .traces { display: none; }
-}
-
 /* --- responsive ------------------------------------------------------------
    The board fills the width; the pin rail becomes a horizontal strip along
-   the top edge, same domed pads, same light. */
+   the top edge, same domed pads, same light. The knob cluster scales down
+   rather than stacking, since it reads as one object. */
 
 @media (max-width: 760px) {
   .wrap { padding: 18px 12px 60px; }
@@ -852,9 +791,14 @@ a { color: inherit; }
   .hero { padding-top: 22px; }
   .pipe { grid-template-columns: minmax(0, 1fr); }
   .step .silk::after { content: ''; }
-  .cta-zone { flex-direction: column; align-items: stretch; }
-  .cta { width: 100%; }
-  .usbc { display: none; }
+
+  .knob-row { gap: 14px; }
+  .sat-dial { width: 38px; height: 38px; }
+  .sat-dial i { width: 24px; height: 24px; }
+  .dl-hero { padding: 8px 16px; }
+  .dl-ring { width: 78px; height: 78px; }
+  .dl-knob { width: 64px; height: 64px; }
+  .dl-knob i { height: 16px; transform-origin: 50% 25px; }
 }
 
 /* --- motion --------------------------------------------------------------- */
