@@ -62,6 +62,11 @@ function startServer() {
 
   const cli = path.join(BIN_DIR, CLI_EXE);
   const env = Object.assign({}, process.env, {
+    // Without this, fork() re-launches the packaged Electron binary itself
+    // rather than running server.js as plain Node, so the "child" is just a
+    // second instance of FORGE32 that immediately quits (single instance
+    // lock) and the real server never starts.
+    ELECTRON_RUN_AS_NODE: '1',
     FORGE32_PORT: String(port),
     FORGE32_SKETCHBOOK: path.join(os.homedir(), 'Forge32'),
   });
@@ -78,12 +83,22 @@ function startServer() {
     env,
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   });
+  // keep the tail of stderr around so a crash dialog can say why, not just that
+  let lastErr = '';
   child.stdout.on('data', (d) => process.stdout.write('[ide] ' + d));
-  child.stderr.on('data', (d) => process.stderr.write('[ide] ' + d));
-  child.on('exit', (code) => {
+  child.stderr.on('data', (d) => {
+    process.stderr.write('[ide] ' + d);
+    lastErr = (lastErr + d.toString()).slice(-2000);
+  });
+  child.on('error', (e) => { lastErr = (lastErr + '\n' + e.message).slice(-2000); });
+  child.on('exit', (code, signal) => {
     child = null;
     if (!app.isQuitting && code !== 0) {
-      dialog.showErrorBox('FORGE32 stopped', 'The build service exited unexpectedly. Reopen FORGE32 to restart it.');
+      const reason = lastErr.trim() || `no output captured (exit code ${code}${signal ? ', signal ' + signal : ''})`;
+      dialog.showErrorBox(
+        'FORGE32 stopped',
+        'The build service exited unexpectedly. Reopen FORGE32 to restart it.\n\n' + reason
+      );
     }
   });
 }
