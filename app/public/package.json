@@ -1,0 +1,4 @@
+{
+  "//": "Marks everything under public/ as ES modules. Only Node reads this; browsers ignore it.",
+  "type": "module"
+}

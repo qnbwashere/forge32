@@ -1,0 +1,19 @@
+{
+  "name": "forge32",
+  "productName": "FORGE32",
+  "version": "1.0.0",
+  "description": "An ESP32 IDE that compiles, flashes and monitors without a toolchain setup",
+  "main": "electron/main.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "node app/server.js",
+    "start": "electron .",
+    "pack:mac": "electron-builder --mac --publish never",
+    "pack:win": "electron-builder --win --publish never",
+    "release": "electron-builder --publish always"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  }
+}

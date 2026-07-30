@@ -1,0 +1,74 @@
+appId: dev.forge32.ide
+productName: FORGE32
+copyright: FORGE32
+
+directories:
+  output: dist
+  buildResources: build
+
+# Only the shell lives in the app bundle. The IDE server, its web assets and
+# the arduino-cli binary ship as plain files in resources/ so nothing has to be
+# read out of an asar archive at runtime.
+files:
+  - electron/**/*
+  - package.json
+
+extraResources:
+  - from: app
+    to: ide
+    filter:
+      - '**/*'
+      - '!**/__pycache__'
+      - '!**/*.pyc'
+  - from: bin
+    to: bin
+    filter: ['**/*']
+
+# ---------------------------------------------------------------------------
+# Artifact names deliberately carry NO version number. That keeps
+#   github.com/<owner>/<repo>/releases/latest/download/FORGE32-mac-arm64.dmg
+# valid forever, which is what the website redirects point at.
+# ---------------------------------------------------------------------------
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  artifactName: FORGE32-mac-${arch}.${ext}
+  category: public.app-category.developer-tools
+  darkModeSupport: true
+  # Ad hoc signature. Enough to launch; see SETUP.md for real notarization.
+  identity: null
+  gatekeeperAssess: false
+  extendInfo:
+    NSAppleEventsUsageDescription: FORGE32 needs this to open your sketchbook folder.
+
+dmg:
+  artifactName: FORGE32-mac-${arch}.${ext}
+  title: FORGE32
+  contents:
+    - x: 140
+      y: 200
+    - x: 400
+      y: 200
+      type: link
+      path: /Applications
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: FORGE32-win-x64.${ext}
+
+nsis:
+  artifactName: FORGE32-win-x64.${ext}
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
+
+publish:
+  provider: github
+  releaseType: release

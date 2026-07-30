@@ -1,0 +1,713 @@
+/* ==========================================================================
+   FORGE32 download page
+   A physical PCB resting on an ESD mat, lit from one source: top left.
+   Every highlight, bevel and shadow in this file agrees with that light.
+   Palette taken off a real ESP32-DevKitC: dark soldermask, white silkscreen,
+   gold ENIG pads, and Espressif red kept for one accent only.
+   ========================================================================== */
+
+:root {
+  --mask:    #10161c;
+  --mask-2:  #151d25;
+  --mask-3:  #1b242e;
+  --trace:   #253442;
+  --silk:    #e9edf0;
+  --silk-2:  #8b99a4;
+  --silk-3:  #5d6b76;
+  --pad:     #d9a441;
+  --pad-hi:  #f0c469;
+  --rst:     #e7352c;
+
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --cond: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+
+  --gap: 28px;
+  --edge: 1px solid var(--trace);
+
+  /* the one light source every gradient and shadow in this file answers to */
+  --lx: -1;
+  --ly: -1;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+/* --- the bench: a dark ESD mat under the board --------------------------- */
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--silk);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.7;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+
+  background-color: #29333b;
+  background-image:
+    /* fine rubber grain */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* lit centre, dark corners, brightest toward the light */
+    radial-gradient(ellipse 90% 70% at 28% 0%, #3c4a53 0%, #2b3740 34%, #1a2127 74%, #10151a 100%);
+  background-blend-mode: overlay, normal;
+}
+
+a { color: inherit; }
+
+::selection { background: var(--pad); color: #0b0f13; }
+
+:focus-visible {
+  outline: 2px solid var(--pad-hi);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* --- silkscreen label: ink sitting proud of the mask ---------------------- */
+
+.silk {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--silk-3);
+  text-shadow: 0 -1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* --- board frame: the PCB itself, resting on the mat ---------------------- */
+
+.wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 34px 22px 90px;
+}
+
+.board {
+  position: relative;
+  border-radius: 18px;
+  padding: 0;
+  background:
+    linear-gradient(200deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 12%),
+    linear-gradient(135deg, #17323080 0%, transparent 45%),
+    linear-gradient(160deg, #1a2f31 0%, #132225 45%, #0e1a1d 100%);
+  background-color: #142428;
+  isolation: isolate;
+
+  /* one soft shadow, cast down and to the right onto the mat, plus a hairline
+     rim that catches the light along the top and left edges only */
+  box-shadow:
+    16px 30px 52px -12px rgba(0, 0, 0, 0.7),
+    5px 10px 16px -4px rgba(0, 0, 0, 0.55),
+    -1px -1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.55),
+    inset 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+/* fine glass-cloth grain across the mask, plus a sheen along the top edge only */
+.board::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 6%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+.board-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 0 34px;
+  padding: 30px 34px 34px;
+}
+
+/* --- mounting holes: plated bore with a gold ring, lit upper-left --------- */
+
+.hole {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  z-index: 3;
+  background: radial-gradient(circle at 50% 50%, #050708 0%, #050708 34%, transparent 35%),
+    conic-gradient(from 225deg, #f0c469, #d9a441 35%, #8a651f 65%, #d9a441 85%, #f0c469 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    -1px -1px 2px rgba(255, 255, 255, 0.35) inset,
+    1px 1px 2px rgba(0, 0, 0, 0.55) inset,
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.hole.tl { top: 14px; left: 14px; }
+.hole.tr { top: 14px; right: 14px; }
+.hole.bl { bottom: 14px; left: 14px; }
+.hole.br { bottom: 14px; right: 14px; }
+
+/* --- copper trace hairlines, restrained -------------------------------- */
+
+.traces {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+/* --- pin rail: domed gold pads ------------------------------------------- */
+
+.rail {
+  border-right: var(--edge);
+  padding: 46px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: flex-end;
+  padding-right: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.pin {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--silk-3);
+}
+
+.pin span {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-shadow: 0 -1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+.pin i {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  flex: none;
+  background:
+    radial-gradient(circle at 32% 28%, #fff6db 0%, #f6d488 16%, var(--pad) 52%, #a97a2a 84%, #7a5a20 100%);
+  box-shadow:
+    0 1.5px 2px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    inset 1px 1px 1.5px rgba(255, 255, 255, 0.6);
+}
+
+.pin.pwr i {
+  background: radial-gradient(circle at 32% 28%, #ffd9d2 0%, #f18f83 16%, var(--rst) 55%, #9c281f 88%, #6e1a15 100%);
+}
+
+/* --- hero --------------------------------------------------------------- */
+
+.hero { padding-top: 42px; position: relative; z-index: 1; }
+
+.eyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.mark {
+  font-family: var(--cond);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: clamp(3.4rem, 10vw, 5.6rem);
+  line-height: 0.86;
+  letter-spacing: -0.005em;
+  margin: 0;
+  color: var(--silk);
+  text-shadow: 0 -1.5px 0 rgba(255, 255, 255, 0.16), 0 1.5px 0 rgba(0, 0, 0, 0.6);
+}
+
+.mark b {
+  color: var(--pad);
+  font-weight: 700;
+  text-shadow: 0 -1.5px 0 rgba(255, 224, 160, 0.35), 0 1.5px 0 rgba(0, 0, 0, 0.7);
+}
+
+.lede {
+  margin: 18px 0 0;
+  max-width: 46ch;
+  color: var(--silk-2);
+  font-size: 13.5px;
+}
+
+.lede strong { color: var(--silk); font-weight: 500; }
+
+/* --- the display module: recessed LCD, not a flat terminal --------------- */
+
+.term {
+  margin-top: 30px;
+  position: relative;
+  border-radius: 8px;
+  padding: 10px;
+  background: linear-gradient(155deg, #2a333b 0%, #1a2027 55%, #12161b 100%);
+  box-shadow:
+    0 6px 14px -4px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.6),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* four Phillips screws, one per corner of the bezel */
+.term .screw {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  z-index: 2;
+  background: radial-gradient(circle at 32% 28%, #dfe4e8 0%, #aab2b9 40%, #5b636a 85%);
+  box-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+.term .screw::before,
+.term .screw::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 1.1px;
+  background: rgba(30, 34, 38, 0.8);
+  box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.15);
+  transform: translate(-50%, -50%);
+}
+.term .screw::after { transform: translate(-50%, -50%) rotate(90deg); }
+
+.term .screw.tl { top: 7px; left: 7px; }
+.term .screw.tr { top: 7px; right: 7px; }
+.term .screw.bl { bottom: 7px; left: 7px; }
+.term .screw.br { bottom: 7px; right: 7px; }
+
+.screen {
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #060907;
+  box-shadow:
+    inset 0 10px 18px -6px rgba(0, 0, 0, 0.9),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px #000;
+}
+
+/* faint CRT pixel grid */
+.screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.25) 0px,
+    rgba(0, 0, 0, 0.25) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.35;
+}
+
+/* glass reflection, a soft diagonal sheen from the same upper-left light */
+.screen::after {
+  content: '';
+  position: absolute;
+  inset: -20% -20%;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    122deg,
+    rgba(255, 255, 255, 0.10) 0%,
+    rgba(255, 255, 255, 0.05) 18%,
+    rgba(255, 255, 255, 0) 34%
+  );
+}
+
+.term-bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 13px;
+  border-bottom: 1px solid #000;
+  background: #0a0f0c;
+}
+
+.term-bar .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--silk-3);
+  flex: none;
+  box-shadow: inset 0.5px 0.5px 0.5px rgba(255, 255, 255, 0.3);
+}
+.term-bar .dot.live { background: var(--pad); box-shadow: 0 0 5px rgba(217, 164, 65, 0.8); }
+.term-bar .dot.done { background: #4fb477; box-shadow: 0 0 5px rgba(79, 180, 119, 0.8); }
+
+.term-body {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 15px 16px 17px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  min-height: 196px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #9fb3a5;
+  text-shadow: 0 0 8px rgba(120, 200, 150, 0.35);
+}
+
+.term-body .ln { display: block; }
+.term-body .k  { color: #d7e6dc; text-shadow: 0 0 9px rgba(180, 230, 195, 0.55); }
+.term-body .g  { color: #6bdc93; text-shadow: 0 0 9px rgba(107, 220, 147, 0.6); }
+.term-body .a  { color: var(--pad-hi); text-shadow: 0 0 9px rgba(240, 196, 105, 0.6); }
+
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  vertical-align: -2px;
+  background: var(--pad-hi);
+  box-shadow: 0 0 8px rgba(240, 196, 105, 0.7);
+  animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+/* --- the download control: a real tactile switch, the hero element ------- */
+
+.cta-zone { margin-top: 38px; }
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 30px 16px 16px;
+  text-decoration: none;
+  border-radius: 10px;
+  background: linear-gradient(150deg, #202a32 0%, #161e25 60%, #10161b 100%);
+  box-shadow:
+    0 10px 18px -8px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* the switch body: black plastic, chamfered, mounted on the board */
+.sw {
+  --press: 0px;
+  width: 54px; height: 54px;
+  flex: none;
+  border-radius: 9px;
+  background: linear-gradient(150deg, #23282d 0%, #16191c 60%, #0b0d0f 100%);
+  display: grid;
+  place-items: center;
+  box-shadow:
+    0 5px 8px rgba(0, 0, 0, 0.55),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.14),
+    inset -1.5px -1.5px 0 rgba(0, 0, 0, 0.65),
+    inset 1.5px 1.5px 0 rgba(255, 255, 255, 0.03);
+  transition: box-shadow 0.15s ease;
+}
+
+/* the cap: brushed metal dome, specular hotspot upper-left */
+.sw i {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  position: relative;
+  transform: translateY(var(--press));
+  background:
+    radial-gradient(circle at 30% 26%, #ffffff 0%, #eef1f3 8%, #c7ced3 30%, #9aa3aa 60%, #6c757c 100%),
+    repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.12) 0px, rgba(255, 255, 255, 0) 1px, rgba(0, 0, 0, 0.05) 2px, rgba(255, 255, 255, 0) 3px);
+  background-blend-mode: normal, overlay;
+  box-shadow:
+    0 3px 4px rgba(0, 0, 0, 0.6),
+    inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.7),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.35);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s ease;
+}
+
+.cta:hover .sw i {
+  background:
+    radial-gradient(circle at 30% 26%, #ffffff 0%, #f6f8f9 10%, #d3d9dd 32%, #a4adb4 62%, #757f86 100%),
+    repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.14) 0px, rgba(255, 255, 255, 0) 1px, rgba(0, 0, 0, 0.05) 2px, rgba(255, 255, 255, 0) 3px);
+}
+
+.cta.armed .sw {
+  box-shadow:
+    0 5px 8px rgba(0, 0, 0, 0.55),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.14),
+    inset -1.5px -1.5px 0 rgba(0, 0, 0, 0.65),
+    0 0 0 2px var(--pad),
+    0 0 18px -2px rgba(217, 164, 65, 0.6);
+}
+
+/* a genuine mechanical press: cap sinks, shadow collapses, hotspot shifts down-right */
+.cta:active .sw {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 2px 4px rgba(0, 0, 0, 0.65),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.cta:active .sw i {
+  --press: 3px;
+  background:
+    radial-gradient(circle at 42% 40%, #e7ebee 0%, #c7ced3 14%, #9aa3aa 40%, #6c757c 75%, #565f66 100%),
+    repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0) 1px, rgba(0, 0, 0, 0.06) 2px, rgba(255, 255, 255, 0) 3px);
+  box-shadow:
+    0 0.5px 1px rgba(0, 0, 0, 0.5),
+    inset 0.5px 0.5px 1px rgba(0, 0, 0, 0.3);
+}
+
+.cta-text { display: flex; flex-direction: column; gap: 3px; }
+
+.cta-main {
+  font-family: var(--cond);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 20px;
+  letter-spacing: 0.03em;
+  line-height: 1.05;
+  color: var(--silk);
+  text-shadow: 0 -1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+.cta-sub {
+  font-size: 11.5px;
+  color: var(--silk-3);
+  letter-spacing: 0.01em;
+}
+
+/* small board detail: recessed USB-C next to the switch, restrained */
+.usbc {
+  width: 30px;
+  height: 13px;
+  border-radius: 7px;
+  flex: none;
+  background: linear-gradient(155deg, #3a4650 0%, #222b32 55%, #12171b 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.18),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.55),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+.usbc::before {
+  content: '';
+  position: absolute;
+  inset: 3px 6px;
+  border-radius: 4px;
+  background: #05070a;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9), inset 0 -0.5px 0 rgba(255, 255, 255, 0.05);
+}
+
+.alts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-top: 18px;
+  align-items: center;
+}
+
+.alts a {
+  font-size: 12px;
+  color: var(--silk-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--trace);
+  padding-bottom: 1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.alts a:hover { color: var(--pad); border-color: var(--pad); }
+.alts a[data-here='1'] { color: var(--silk); }
+
+/* --- pipeline: a real sequence, so the arrows carry meaning --------------- */
+
+.pipe {
+  margin-top: 78px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--trace);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+.step {
+  background: linear-gradient(160deg, #16232670 0%, transparent 60%), var(--mask);
+  padding: 22px 20px 24px;
+}
+
+.step h3 {
+  font-family: var(--cond);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 15px;
+  letter-spacing: 0.09em;
+  margin: 9px 0 8px;
+  color: var(--silk);
+  text-shadow: 0 -1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+.step p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--silk-2);
+  line-height: 1.65;
+}
+
+.step .silk::after {
+  content: ' \2192';
+  color: var(--pad);
+}
+.step:last-child .silk::after { content: ''; }
+
+/* --- first launch -------------------------------------------------------- */
+
+.note {
+  margin-top: 46px;
+  border-radius: 4px 10px 10px 4px;
+  border-left: 3px solid var(--pad);
+  background: linear-gradient(150deg, #1a232c 0%, #141c23 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
+    0 4px 10px -6px rgba(0, 0, 0, 0.5);
+  padding: 20px 22px 22px;
+}
+
+.note h2 {
+  font-family: var(--cond);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 17px;
+  letter-spacing: 0.08em;
+  margin: 8px 0 12px;
+  text-shadow: 0 -1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+.note ol {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 12.5px;
+  color: var(--silk-2);
+}
+
+.note li { margin-bottom: 9px; }
+.note li:last-child { margin-bottom: 0; }
+.note code {
+  background: #0a1116;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 11.5px;
+  color: var(--pad-hi);
+}
+
+/* --- footer -------------------------------------------------------------- */
+
+.foot {
+  margin-top: 54px;
+  padding-top: 20px;
+  border-top: var(--edge);
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  color: var(--silk-3);
+  font-size: 11.5px;
+}
+
+.foot a { text-decoration: none; border-bottom: 1px solid var(--trace); }
+.foot a:hover { color: var(--pad); border-color: var(--pad); }
+
+/* --- a lone electrolytic can, tucked near the footer, restrained --------- */
+
+.cap {
+  position: absolute;
+  width: 26px;
+  height: 30px;
+  right: 40px;
+  bottom: 96px;
+  z-index: 1;
+  border-radius: 4px 4px 3px 3px;
+  background:
+    radial-gradient(circle at 28% 14%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 30%),
+    linear-gradient(120deg, #4a5a63 0%, #2c3941 45%, #171f24 100%);
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.5),
+    inset -2px -2px 3px rgba(0, 0, 0, 0.5),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.15);
+}
+.cap::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 8px;
+  border-radius: 4px 4px 0 0;
+  background: radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%), #384750;
+}
+
+@media (max-width: 900px) {
+  .cap { display: none; }
+}
+
+@media (max-width: 760px) {
+  .traces { display: none; }
+}
+
+/* --- responsive ------------------------------------------------------------
+   The board fills the width; the pin rail becomes a horizontal strip along
+   the top edge, same domed pads, same light. */
+
+@media (max-width: 760px) {
+  .wrap { padding: 18px 12px 60px; }
+  .board-grid { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 20px 16px 26px; }
+
+  .rail {
+    border-right: 0;
+    border-bottom: var(--edge);
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 16px;
+    padding: 4px 0 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .rail::-webkit-scrollbar { display: none; }
+  .pin { flex-direction: column-reverse; gap: 6px; flex: none; }
+
+  .hero { padding-top: 22px; }
+  .pipe { grid-template-columns: minmax(0, 1fr); }
+  .step .silk::after { content: ''; }
+  .cta-zone { flex-direction: column; align-items: stretch; }
+  .cta { width: 100%; }
+  .usbc { display: none; }
+}
+
+/* --- motion --------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+  .caret { display: none; }
+}

@@ -1,0 +1,4004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESP32 Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ------------------------------------------------------------------
+   ESP32 Studio
+   Direction: solder mask and gold pads. The substrate is dark green
+   epoxy, the accents are ENIG gold, the labels are silkscreen.
+   ------------------------------------------------------------------ */
+:root{
+  --mask:#0A1210; --panel:#101A17; --panel2:#14211D; --trace:#1C2F29;
+  --trace2:#26443A; --gold:#E3B457; --pad:#B98A2E; --flux:#E6EFE9;
+  --muted:#7C948C; --dim:#546962;
+  --hot:#E4563C; --ok:#46C98B; --wire:#62B6D8; --violet:#B18AD6;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --cond:'IBM Plex Sans Condensed','Roboto Condensed',system-ui,sans-serif;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+  --code:13px; --lh:1.55;
+  --rail:34px; --side:212px; --insp:290px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--mask); color:var(--flux); font-family:var(--sans);
+  font-size:13px; overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+::selection{background:rgba(227,180,87,.28)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* silkscreen label */
+.silk{
+  font-family:var(--cond); font-size:10px; font-weight:600;
+  letter-spacing:.15em; text-transform:uppercase; color:var(--dim);
+}
+
+/* ---------- shell ---------- */
+#app{
+  display:grid; height:100%;
+  grid-template-columns:var(--rail) var(--side) minmax(0,1fr) var(--insp);
+  grid-template-rows:42px minmax(0,1fr) 22px;
+  grid-template-areas:
+    "rail top   top   top"
+    "rail side  main  insp"
+    "rail status status status";
+}
+
+/* ---------- edge connector rail (signature) ---------- */
+#rail{
+  grid-area:rail; background:var(--panel);
+  border-right:1px solid var(--trace);
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  padding:7px 0; position:relative;
+}
+#rail::after{
+  content:''; position:absolute; inset:auto 0 0 0; height:64px;
+  background:repeating-linear-gradient(to bottom,
+    var(--pad) 0 4px, transparent 4px 9px);
+  opacity:.3; margin:0 9px;
+}
+.led{
+  width:8px;height:8px;border-radius:50%;
+  background:#132a22; border:1px solid #1e3b31; margin:5px 0;
+  transition:background .12s, box-shadow .12s;
+}
+.led.on{background:var(--gold);box-shadow:0 0 7px 1px rgba(227,180,87,.7);
+  border-color:var(--gold)}
+.led.ok{background:var(--ok);box-shadow:0 0 7px 1px rgba(70,201,139,.6);
+  border-color:var(--ok)}
+.led.bad{background:var(--hot);box-shadow:0 0 7px 1px rgba(228,86,60,.6);
+  border-color:var(--hot)}
+.railtag{font-family:var(--cond);font-size:8px;letter-spacing:.1em;
+  color:var(--dim);text-transform:uppercase;margin-bottom:9px}
+#rail .spacer{flex:1}
+.railbtn{
+  background:none;border:1px solid transparent;color:var(--dim);
+  width:24px;height:24px;border-radius:3px;cursor:pointer;font-size:13px;
+  display:grid;place-items:center;padding:0
+}
+.railbtn:hover{color:var(--gold);border-color:var(--trace2)}
+
+/* ---------- top bar ---------- */
+#top{
+  grid-area:top; background:var(--panel);
+  border-bottom:1px solid var(--trace);
+  display:flex; align-items:center; gap:10px; padding:0 10px 0 12px;
+}
+#brand{display:flex;align-items:baseline;gap:7px;margin-right:4px}
+#brand b{font-family:var(--cond);font-weight:700;font-size:15px;
+  letter-spacing:.05em;color:var(--flux)}
+#brand span{font-family:var(--cond);font-size:9px;letter-spacing:.18em;
+  color:var(--pad);text-transform:uppercase}
+.vr{width:1px;height:20px;background:var(--trace)}
+.pick{
+  background:var(--mask); border:1px solid var(--trace2); border-radius:3px;
+  padding:4px 7px; font-family:var(--mono); font-size:11px; max-width:200px;
+  cursor:pointer; text-overflow:ellipsis;
+}
+.pick:hover{border-color:var(--pad)}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--panel2); border:1px solid var(--trace2); color:var(--flux);
+  padding:5px 11px; border-radius:3px; cursor:pointer;
+  font-family:var(--cond); font-size:11px; font-weight:600;
+  letter-spacing:.09em; text-transform:uppercase; white-space:nowrap;
+}
+.btn:hover:not(:disabled){border-color:var(--pad);background:#18251f}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.go{background:var(--gold);border-color:var(--gold);color:#161206}
+.btn.go:hover:not(:disabled){background:#f0c368;border-color:#f0c368}
+.btn.danger:hover:not(:disabled){border-color:var(--hot);color:var(--hot)}
+.btn kbd{font-family:var(--mono);font-size:9px;opacity:.55;font-weight:400;
+  letter-spacing:0}
+#top .grow{flex:1}
+
+/* ---------- sidebar ---------- */
+#side{
+  grid-area:side; background:var(--panel); border-right:1px solid var(--trace);
+  overflow-y:auto; display:flex; flex-direction:column;
+}
+.sect{border-bottom:1px solid var(--trace)}
+.sect>header{
+  display:flex;align-items:center;gap:6px;padding:8px 10px 6px;
+  cursor:pointer;user-select:none;
+}
+.sect>header:hover .silk{color:var(--muted)}
+.sect>header .caret{font-size:8px;color:var(--dim);transition:transform .12s}
+.sect.closed>header .caret{transform:rotate(-90deg)}
+.sect.closed>.body{display:none}
+.sect>header .grow{flex:1}
+.sect .add{background:none;border:none;color:var(--dim);cursor:pointer;
+  font-size:14px;line-height:1;padding:0 2px}
+.sect .add:hover{color:var(--gold)}
+.body{padding:0 6px 8px}
+.row{
+  display:flex;align-items:center;gap:7px;padding:4px 7px;border-radius:3px;
+  cursor:pointer;font-family:var(--mono);font-size:11.5px;color:var(--muted);
+  border:1px solid transparent;
+}
+.row:hover{background:var(--panel2);color:var(--flux)}
+.row.sel{background:#182a23;color:var(--gold);border-color:var(--trace2)}
+.row .dot{width:5px;height:5px;border-radius:50%;background:var(--trace2);
+  flex:none}
+.row.sel .dot{background:var(--gold)}
+.row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .kill{opacity:0;background:none;border:none;color:var(--dim);
+  cursor:pointer;font-size:12px;padding:0}
+.row:hover .kill{opacity:1}
+.row .kill:hover{color:var(--hot)}
+.hint{padding:6px 8px;color:var(--dim);font-size:11px;line-height:1.5}
+
+/* ---------- main ---------- */
+#main{grid-area:main;display:flex;flex-direction:column;min-width:0;
+  background:var(--mask)}
+#tabs{
+  display:flex;align-items:stretch;background:var(--panel);
+  border-bottom:1px solid var(--trace);overflow-x:auto;flex:none;height:31px;
+  scrollbar-width:none;
+}
+#tabs::-webkit-scrollbar{display:none}
+.tab{
+  display:flex;align-items:center;gap:7px;padding:0 11px;cursor:pointer;
+  font-family:var(--mono);font-size:11.5px;color:var(--muted);
+  border-right:1px solid var(--trace);white-space:nowrap;
+  border-top:2px solid transparent;
+}
+.tab:hover{color:var(--flux)}
+.tab.sel{background:var(--mask);color:var(--flux);border-top-color:var(--gold)}
+.tab .mod{color:var(--gold);font-size:14px;line-height:1}
+.tab .x{opacity:0;color:var(--dim);font-size:12px}
+.tab:hover .x{opacity:1}
+.tab .x:hover{color:var(--hot)}
+
+/* ---------- editor ---------- */
+#edwrap{position:relative;flex:1;min-height:0;overflow:hidden;
+  display:flex;font-family:var(--mono);font-size:var(--code)}
+#gutter{
+  flex:none;padding:10px 8px 40vh 10px;text-align:right;color:#3d514a;
+  background:var(--mask);border-right:1px solid var(--trace);
+  user-select:none;overflow:hidden;line-height:var(--lh);
+  font-variant-numeric:tabular-nums;position:relative;
+}
+#gutter .g{position:relative;padding-right:2px}
+#gutter .g.cur{color:var(--gold)}
+#gutter .g.err::before{content:'';position:absolute;left:-8px;top:5px;
+  width:5px;height:5px;border-radius:50%;background:var(--hot)}
+#gutter .g.warn::before{content:'';position:absolute;left:-8px;top:5px;
+  width:5px;height:5px;border-radius:50%;background:var(--gold)}
+#scroll{position:relative;flex:1;overflow:auto;min-width:0}
+#layers{position:relative;min-height:100%;width:max-content;min-width:100%}
+#hl,#ta,#ghost{
+  margin:0;padding:10px 24px 40vh 12px;border:0;
+  font:inherit;line-height:var(--lh);
+  white-space:pre;tab-size:2;
+}
+#hl{position:relative;pointer-events:none;color:var(--flux)}
+#ghost{position:absolute;inset:0;pointer-events:none;color:#4e6660;
+  z-index:1}
+#ghost i{font-style:normal;background:rgba(227,180,87,.05);
+  border-radius:2px;padding:0 1px 1px 0}
+#ta{
+  position:absolute;inset:0;background:transparent;color:transparent;
+  caret-color:var(--gold);resize:none;outline:none;overflow:hidden;z-index:2;
+}
+#ta::selection{background:rgba(227,180,87,.25)}
+.err-underline{
+  background:linear-gradient(to bottom,transparent 82%,
+    rgba(228,86,60,.85) 82%);
+}
+.warn-underline{
+  background:linear-gradient(to bottom,transparent 82%,
+    rgba(227,180,87,.75) 82%);
+}
+#curline{position:absolute;left:0;right:0;background:rgba(255,255,255,.022);
+  pointer-events:none;z-index:0}
+
+/* tokens */
+.t-cm{color:#527066;font-style:italic}
+.t-pp{color:var(--violet)}
+.t-st{color:#93D6A6}
+.t-nu{color:#E0A87A}
+.t-kw{color:var(--gold);font-weight:500}
+.t-ty{color:var(--wire)}
+.t-api{color:#D7E4DC}
+.t-fn{color:#EBD9A8}
+.t-cn{color:#C9A0DC}
+.t-op{color:#7f9a91}
+
+/* ---------- autocomplete ---------- */
+#ac{
+  position:absolute;z-index:40;display:none;
+  background:#0D1714;border:1px solid var(--trace2);border-radius:4px;
+  box-shadow:0 14px 34px rgba(0,0,0,.6);overflow:hidden;
+  width:430px;max-width:calc(100vw - 40px);
+}
+#aclist{max-height:222px;overflow-y:auto}
+.ai{
+  display:flex;align-items:center;gap:8px;padding:5px 9px;cursor:pointer;
+  font-family:var(--mono);font-size:12px;color:var(--muted);
+  border-left:2px solid transparent;
+}
+.ai.sel{background:#182a23;color:var(--flux);border-left-color:var(--gold)}
+.ai .kind{
+  font-family:var(--cond);font-size:8.5px;letter-spacing:.1em;
+  text-transform:uppercase;padding:1px 4px;border-radius:2px;flex:none;
+  min-width:34px;text-align:center;border:1px solid;
+}
+.k-fn{color:var(--gold);border-color:#3d3218;background:#1d1a0d}
+.k-ty{color:var(--wire);border-color:#1c3a46;background:#0e1e24}
+.k-cn{color:var(--violet);border-color:#332545;background:#1a1224}
+.k-var{color:var(--ok);border-color:#1b3c2c;background:#0d1f17}
+.k-snip{color:#E0A87A;border-color:#43301e;background:#221810}
+.k-hdr{color:#93D6A6;border-color:#22402e;background:#101f16}
+.ai .lbl{flex:none;color:inherit}
+.ai .lbl em{font-style:normal;color:var(--gold);font-weight:600}
+.ai.sel .lbl em{color:#f5cf7d}
+.ai .sig{color:#5c7469;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;flex:1;font-size:11px}
+#acdoc{
+  border-top:1px solid var(--trace);padding:7px 10px;font-size:11.5px;
+  color:var(--muted);line-height:1.5;max-height:96px;overflow-y:auto;
+  background:#0A1310;
+}
+#acdoc code{font-family:var(--mono);color:var(--gold);font-size:11px}
+#acdoc .ret{color:var(--wire);font-family:var(--mono);font-size:11px}
+#sighelp{
+  position:absolute;z-index:39;display:none;background:#0D1714;
+  border:1px solid var(--trace2);border-radius:4px;padding:5px 9px;
+  font-family:var(--mono);font-size:11.5px;color:var(--muted);
+  box-shadow:0 8px 22px rgba(0,0,0,.55);max-width:520px;
+}
+#sighelp b{color:var(--gold);font-weight:600}
+#sighelp .cur{color:var(--flux);background:rgba(227,180,87,.16);
+  border-radius:2px;padding:0 2px}
+
+/* ---------- inspector ---------- */
+#insp{
+  grid-area:insp;background:var(--panel);border-left:1px solid var(--trace);
+  display:flex;flex-direction:column;min-width:0;
+}
+#insptabs{display:flex;border-bottom:1px solid var(--trace);flex:none}
+#insptabs button{
+  flex:1;background:none;border:none;border-bottom:2px solid transparent;
+  padding:8px 2px;cursor:pointer;font-family:var(--cond);font-size:9.5px;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--dim);
+}
+#insptabs button:hover{color:var(--muted)}
+#insptabs button.sel{color:var(--gold);border-bottom-color:var(--gold)}
+.ipane{display:none;flex:1;overflow-y:auto;padding:10px}
+.ipane.sel{display:block}
+
+/* pinout, the signature element */
+#board{
+  border:1px solid var(--trace2);border-radius:5px;background:#0C1614;
+  padding:9px 0;position:relative;
+}
+#board .bname{text-align:center;margin-bottom:7px}
+#pins{display:grid;grid-template-columns:1fr auto 1fr;gap:0 8px;
+  align-items:start}
+#pins .col{display:flex;flex-direction:column;gap:1px}
+#pins .spine{width:26px;background:repeating-linear-gradient(to bottom,
+  var(--trace) 0 1px,transparent 1px 6px);border-radius:2px;
+  align-self:stretch;margin:2px 0;opacity:.5}
+.pin{
+  display:flex;align-items:center;gap:5px;padding:1px 5px;cursor:default;
+  font-family:var(--mono);font-size:10.5px;color:var(--muted);
+  border-radius:2px;
+}
+#pins .col.right .pin{flex-direction:row-reverse}
+.pin:hover{background:#17272120}
+.pin .pad{width:9px;height:9px;border:1.5px solid var(--pad);border-radius:2px;
+  flex:none;background:#0d1a15}
+.pin .n{min-width:30px}
+.pin.used{color:var(--gold)}
+.pin.used .pad{background:var(--gold);box-shadow:0 0 6px rgba(227,180,87,.55)}
+.pin.warn .pad{border-color:var(--hot)}
+.pin.pwr{color:var(--hot)}
+.pin.pwr .pad{border-color:var(--hot);background:#1c100e}
+.pin.gnd{color:var(--dim)}
+.pin.gnd .pad{border-color:var(--dim)}
+#pindoc{
+  margin-top:9px;border:1px solid var(--trace);border-radius:4px;
+  padding:8px 9px;font-size:11.5px;line-height:1.5;color:var(--muted);
+  min-height:66px;
+}
+#pindoc h4{margin:0 0 4px;font-family:var(--mono);font-size:12px;
+  color:var(--gold);font-weight:600}
+#pindoc .tags{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 0}
+#pindoc .tag{font-family:var(--cond);font-size:9px;letter-spacing:.08em;
+  text-transform:uppercase;border:1px solid var(--trace2);border-radius:2px;
+  padding:1px 4px;color:var(--muted)}
+#pindoc .tag.bad{border-color:#4a2018;color:var(--hot)}
+.legend{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:4px;font-size:10px;
+  color:var(--dim)}
+.legend i{width:8px;height:8px;border-radius:2px;border:1.5px solid;
+  display:block}
+
+/* library + snippet lists */
+.search{
+  display:flex;gap:6px;margin-bottom:8px;
+}
+.search input{
+  flex:1;background:var(--mask);border:1px solid var(--trace2);
+  border-radius:3px;padding:5px 8px;font-family:var(--mono);font-size:11.5px;
+}
+.search input:focus{outline:none;border-color:var(--pad)}
+.card{
+  border:1px solid var(--trace);border-radius:4px;padding:8px 9px;
+  margin-bottom:6px;background:#0C1614;
+}
+.card h5{margin:0 0 3px;font-family:var(--mono);font-size:12px;
+  color:var(--flux);font-weight:600;display:flex;gap:6px;align-items:baseline}
+.card h5 .v{font-size:10px;color:var(--pad)}
+.card p{margin:0;font-size:11px;color:var(--muted);line-height:1.45}
+.card .foot{display:flex;align-items:center;gap:6px;margin-top:7px}
+.card .foot .who{flex:1;font-size:10px;color:var(--dim);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.mini{
+  background:var(--panel2);border:1px solid var(--trace2);border-radius:3px;
+  padding:3px 8px;cursor:pointer;font-family:var(--cond);font-size:10px;
+  font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);
+}
+.mini:hover{border-color:var(--pad);color:var(--gold)}
+.mini.on{background:var(--gold);border-color:var(--gold);color:#161206}
+.mini:disabled{opacity:.45;cursor:default}
+.snipgrid{display:flex;flex-direction:column;gap:4px}
+.snip{
+  border:1px solid var(--trace);border-radius:4px;padding:7px 9px;
+  cursor:pointer;background:#0C1614;
+}
+.snip:hover{border-color:var(--pad)}
+.snip b{display:block;font-family:var(--mono);font-size:11.5px;
+  color:var(--flux);font-weight:500}
+.snip small{color:var(--dim);font-size:10.5px}
+.fields{display:flex;flex-direction:column;gap:9px}
+.field label{display:block;margin-bottom:3px}
+.field select,.field input{
+  width:100%;background:var(--mask);border:1px solid var(--trace2);
+  border-radius:3px;padding:5px 7px;font-family:var(--mono);font-size:11.5px;
+}
+
+/* ---------- console ---------- */
+#console{
+  flex:none;height:210px;display:flex;flex-direction:column;
+  border-top:1px solid var(--trace);background:var(--panel);min-height:26px;
+}
+#drag{height:4px;cursor:row-resize;background:transparent;margin-top:-4px;
+  position:relative;z-index:5}
+#drag:hover{background:var(--trace2)}
+#ctabs{display:flex;align-items:center;gap:2px;padding:0 8px;flex:none;
+  border-bottom:1px solid var(--trace);height:27px}
+#ctabs button{
+  background:none;border:none;border-bottom:2px solid transparent;
+  padding:6px 9px;cursor:pointer;font-family:var(--cond);font-size:10px;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--dim);
+  display:flex;align-items:center;gap:5px;
+}
+#ctabs button.sel{color:var(--gold);border-bottom-color:var(--gold)}
+#ctabs button:hover{color:var(--muted)}
+#ctabs .count{background:var(--hot);color:#fff;border-radius:7px;
+  padding:0 5px;font-size:9px;font-family:var(--mono)}
+#ctabs .count.warn{background:var(--gold);color:#161206}
+#ctabs .grow{flex:1}
+.cpane{display:none;flex:1;min-height:0;flex-direction:column}
+.cpane.sel{display:flex}
+#outlog,#serlog{
+  flex:1;overflow-y:auto;padding:6px 10px;font-family:var(--mono);
+  font-size:11.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;
+}
+#outlog .cmd{color:var(--pad)}
+#outlog .err{color:var(--hot)}
+#outlog .ok{color:var(--ok)}
+#outlog .note{color:var(--wire)}
+#serlog .tx{color:var(--gold)}
+#serlog .sys{color:var(--wire)}
+#serlog .ts{color:var(--dim)}
+#serbar{display:flex;gap:6px;padding:6px 8px;border-top:1px solid var(--trace);
+  flex:none;align-items:center}
+#serbar input[type=text]{
+  flex:1;background:var(--mask);border:1px solid var(--trace2);
+  border-radius:3px;padding:5px 8px;font-family:var(--mono);font-size:11.5px;
+}
+#serbar select{background:var(--mask);border:1px solid var(--trace2);
+  border-radius:3px;padding:4px 5px;font-family:var(--mono);font-size:11px}
+.chk{display:flex;align-items:center;gap:4px;font-size:10.5px;
+  color:var(--muted);cursor:pointer;white-space:nowrap}
+.chk input{accent-color:var(--gold);margin:0}
+#problist{flex:1;overflow-y:auto;padding:4px 0}
+.prob{
+  display:flex;gap:8px;padding:5px 10px;cursor:pointer;font-family:var(--mono);
+  font-size:11.5px;align-items:baseline;border-left:2px solid transparent;
+}
+.prob:hover{background:var(--panel2)}
+.prob .mk{flex:none;font-weight:600}
+.prob.e{border-left-color:var(--hot)}
+.prob.e .mk{color:var(--hot)}
+.prob.w{border-left-color:var(--gold)}
+.prob.w .mk{color:var(--gold)}
+.prob .where{color:var(--dim);flex:none}
+.prob .msg{color:var(--muted);flex:1}
+.empty{padding:14px 12px;color:var(--dim);font-size:11.5px;line-height:1.6}
+
+/* plotter */
+#plot{flex:none;height:0;overflow:hidden;border-top:1px solid var(--trace);
+  background:#0A1310;transition:height .15s}
+#plot.on{height:118px}
+#plotcv{display:block;width:100%;height:118px}
+
+/* ---------- status ---------- */
+#status{
+  grid-area:status;background:var(--panel);border-top:1px solid var(--trace);
+  display:flex;align-items:center;gap:0;font-family:var(--mono);font-size:10.5px;
+  color:var(--muted);padding:0;overflow:hidden;
+}
+#status .cell{padding:0 10px;border-right:1px solid var(--trace);
+  height:100%;display:flex;align-items:center;gap:6px;white-space:nowrap}
+#status .cell.grow{flex:1;border-right:none;overflow:hidden;
+  text-overflow:ellipsis}
+#status .bar{width:52px;height:5px;background:#152420;border-radius:2px;
+  overflow:hidden;flex:none}
+#status .bar i{display:block;height:100%;background:var(--gold);width:0;
+  transition:width .3s}
+#status .bar i.hi{background:var(--hot)}
+#status b{color:var(--flux);font-weight:500}
+#status .clickable{cursor:pointer}
+#status .clickable:hover{color:var(--gold)}
+
+/* ---------- overlays ---------- */
+#modal{
+  position:fixed;inset:0;background:rgba(4,8,7,.78);display:none;
+  place-items:center;z-index:100;padding:20px;
+}
+#modal.on{display:grid}
+#mcard{
+  background:var(--panel);border:1px solid var(--trace2);border-radius:6px;
+  width:min(600px,100%);max-height:86vh;overflow-y:auto;
+  box-shadow:0 26px 60px rgba(0,0,0,.65);
+}
+#mcard header{padding:13px 16px;border-bottom:1px solid var(--trace);
+  display:flex;align-items:center;gap:8px}
+#mcard header h3{margin:0;font-family:var(--cond);font-size:14px;
+  letter-spacing:.06em;text-transform:uppercase;flex:1}
+#mcard .mbody{padding:15px 16px}
+#mcard .mbody p{margin:0 0 10px;line-height:1.6;color:var(--muted)}
+#mcard .mbody code{font-family:var(--mono);background:var(--mask);
+  border:1px solid var(--trace);border-radius:3px;padding:1px 5px;
+  color:var(--gold);font-size:11.5px}
+#mcard footer{padding:11px 16px;border-top:1px solid var(--trace);
+  display:flex;gap:8px;justify-content:flex-end}
+.step{display:flex;gap:10px;align-items:flex-start;padding:9px 0;
+  border-bottom:1px solid var(--trace)}
+.step:last-child{border-bottom:none}
+.step .num{font-family:var(--mono);color:var(--pad);flex:none;width:18px}
+.step .txt{flex:1}
+.step .txt b{display:block;color:var(--flux);font-weight:500;margin-bottom:2px}
+.step .txt small{color:var(--muted);line-height:1.5;display:block}
+.step .state{flex:none;font-family:var(--cond);font-size:9.5px;
+  letter-spacing:.1em;text-transform:uppercase;padding-top:2px}
+.state.ok{color:var(--ok)} .state.bad{color:var(--hot)}
+.state.run{color:var(--gold)} .state.idle{color:var(--dim)}
+#toast{
+  position:fixed;bottom:36px;left:50%;transform:translateX(-50%) translateY(8px);
+  background:#132320;border:1px solid var(--trace2);border-radius:4px;
+  padding:8px 14px;font-size:12px;opacity:0;pointer-events:none;
+  transition:opacity .18s,transform .18s;z-index:120;max-width:80vw;
+  box-shadow:0 10px 26px rgba(0,0,0,.5);
+}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.bad{border-color:var(--hot)} #toast.good{border-color:var(--ok)}
+#banner{
+  display:none;align-items:center;gap:10px;padding:7px 12px;
+  background:#20180a;border-bottom:1px solid #4a3a14;font-size:12px;
+  color:#e8d2a0;
+}
+#banner.on{display:flex}
+#banner .grow{flex:1}
+#find{
+  position:absolute;top:6px;right:26px;z-index:35;display:none;
+  background:#0D1714;border:1px solid var(--trace2);border-radius:4px;
+  padding:5px 6px;gap:5px;align-items:center;
+  box-shadow:0 8px 20px rgba(0,0,0,.5);
+}
+#find.on{display:flex}
+#find input{background:var(--mask);border:1px solid var(--trace2);
+  border-radius:3px;padding:3px 7px;font-family:var(--mono);font-size:11.5px;
+  width:150px}
+#find .n{font-family:var(--mono);font-size:10.5px;color:var(--dim);
+  min-width:44px;text-align:center}
+
+/* scrollbars */
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:#1e332c;border-radius:5px;
+  border:2px solid var(--mask)}
+*::-webkit-scrollbar-thumb:hover{background:#2b483e}
+
+/* ---------- narrow screens ---------- */
+#mobbar{display:none}
+@media (max-width:1080px){
+  :root{--insp:0px}
+  #insp{position:fixed;top:0;right:0;bottom:0;width:290px;z-index:60;
+    transform:translateX(100%);transition:transform .18s;
+    border-left:1px solid var(--trace2);box-shadow:-14px 0 34px rgba(0,0,0,.5)}
+  #insp.open{transform:none}
+  #app{grid-template-columns:var(--rail) var(--side) minmax(0,1fr);
+    grid-template-areas:"rail top top" "rail side main" "rail status status"}
+}
+@media (max-width:760px){
+  :root{--side:0px;--rail:30px}
+  #side{position:fixed;top:0;bottom:0;left:var(--rail);width:212px;z-index:60;
+    transform:translateX(-110%);transition:transform .18s;
+    box-shadow:14px 0 34px rgba(0,0,0,.5)}
+  #side.open{transform:none}
+  #app{grid-template-columns:var(--rail) minmax(0,1fr);
+    grid-template-areas:"rail top" "rail main" "rail status"}
+  #brand span{display:none}
+  .btn kbd{display:none}
+  #mobbar{display:flex;gap:4px}
+  #top{gap:6px;padding:0 6px 0 8px}
+  #console{height:170px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- edge connector rail: live status LEDs -->
+  <div id="rail" title="board link status">
+    <div class="railtag">IO</div>
+    <div class="led" id="led-link" title="backend link"></div>
+    <div class="led" id="led-build" title="build"></div>
+    <div class="led" id="led-flash" title="flash"></div>
+    <div class="led" id="led-rx" title="serial receive"></div>
+    <div class="led" id="led-tx" title="serial send"></div>
+    <div class="spacer"></div>
+    <button class="railbtn" id="mob-side" title="Files">&#9776;</button>
+    <button class="railbtn" id="btn-setup" title="Setup and toolchain">&#9881;</button>
+    <button class="railbtn" id="btn-help" title="Keyboard shortcuts">?</button>
+  </div>
+
+  <!-- top bar -->
+  <div id="top">
+    <div id="brand"><b>ESP32</b><span>studio</span></div>
+    <div class="vr"></div>
+    <select class="pick" id="sel-board" title="Target board"></select>
+    <select class="pick" id="sel-port" title="Serial port"></select>
+    <button class="mini" id="btn-rescan" title="Rescan ports">&#8635;</button>
+    <div class="vr"></div>
+    <button class="btn" id="btn-verify">Verify <kbd>^R</kbd></button>
+    <button class="btn go" id="btn-upload">Upload <kbd>^U</kbd></button>
+    <button class="btn" id="btn-monitor">Monitor <kbd>^M</kbd></button>
+    <div class="grow"></div>
+    <div id="mobbar">
+      <button class="mini" id="mob-insp">Panel</button>
+    </div>
+    <button class="btn" id="btn-save" title="Save sketch">Save <kbd>^S</kbd></button>
+  </div>
+
+  <!-- sidebar -->
+  <div id="side">
+    <div class="sect" id="s-sketches">
+      <header><span class="caret">&#9662;</span><span class="silk">Sketches</span>
+        <span class="grow"></span>
+        <button class="add" id="btn-newsketch" title="New sketch">+</button>
+      </header>
+      <div class="body" id="sketchlist"></div>
+    </div>
+    <div class="sect" id="s-files">
+      <header><span class="caret">&#9662;</span><span class="silk">Files</span>
+        <span class="grow"></span>
+        <button class="add" id="btn-newfile" title="Add file to sketch">+</button>
+      </header>
+      <div class="body" id="filelist"></div>
+    </div>
+    <div class="sect" id="s-out">
+      <header><span class="caret">&#9662;</span><span class="silk">Outline</span></header>
+      <div class="body" id="outline"></div>
+    </div>
+  </div>
+
+  <!-- editor column -->
+  <div id="main">
+    <div id="banner">
+      <span id="bantext"></span>
+      <span class="grow"></span>
+      <button class="mini" id="ban-act">Fix</button>
+      <button class="mini" id="ban-hide">Dismiss</button>
+    </div>
+    <div id="tabs"></div>
+    <div id="edwrap">
+      <div id="gutter"></div>
+      <div id="scroll">
+        <div id="layers">
+          <div id="curline"></div>
+          <pre id="hl" aria-hidden="true"></pre>
+          <div id="ghost" aria-hidden="true"></div>
+          <textarea id="ta" spellcheck="false" autocomplete="off"
+            autocapitalize="off" wrap="off" aria-label="Code editor"></textarea>
+        </div>
+      </div>
+      <div id="find">
+        <input id="findq" placeholder="find" aria-label="Find text">
+        <span class="n" id="findn">0/0</span>
+        <button class="mini" id="findprev">&#8593;</button>
+        <button class="mini" id="findnext">&#8595;</button>
+        <button class="mini" id="findx">&#215;</button>
+      </div>
+      <div id="ac" role="listbox" aria-label="Suggestions">
+        <div id="aclist"></div>
+        <div id="acdoc"></div>
+      </div>
+      <div id="sighelp"></div>
+    </div>
+
+    <div id="drag" title="Drag to resize"></div>
+    <div id="console">
+      <div id="ctabs">
+        <button data-c="out" class="sel">Output</button>
+        <button data-c="ser">Serial</button>
+        <button data-c="prob">Problems <span class="count" id="probcount"
+          style="display:none">0</span></button>
+        <span class="grow"></span>
+        <button class="mini" id="btn-clearlog">Clear</button>
+      </div>
+      <div class="cpane sel" data-c="out"><div id="outlog"></div></div>
+      <div class="cpane" data-c="ser">
+        <div id="serlog"></div>
+        <div id="plot"><canvas id="plotcv"></canvas></div>
+        <div id="serbar">
+          <select id="sel-baud" title="Baud rate">
+            <option>9600</option><option>19200</option><option>38400</option>
+            <option>57600</option><option selected>115200</option>
+            <option>230400</option><option>460800</option><option>921600</option>
+          </select>
+          <input type="text" id="sertx" placeholder="send to board and press Enter"
+            aria-label="Send to serial port">
+          <select id="sel-ending" title="Line ending">
+            <option value="\n">LF</option>
+            <option value="\r\n">CRLF</option>
+            <option value="\r">CR</option>
+            <option value="">none</option>
+          </select>
+          <label class="chk"><input type="checkbox" id="cb-ts">time</label>
+          <label class="chk"><input type="checkbox" id="cb-auto" checked>scroll</label>
+          <label class="chk"><input type="checkbox" id="cb-plot">plot</label>
+        </div>
+      </div>
+      <div class="cpane" data-c="prob"><div id="problist"></div></div>
+    </div>
+  </div>
+
+  <!-- inspector -->
+  <div id="insp">
+    <div id="insptabs">
+      <button data-i="pins" class="sel">Pins</button>
+      <button data-i="libs">Libraries</button>
+      <button data-i="snips">Insert</button>
+      <button data-i="board">Board</button>
+    </div>
+
+    <div class="ipane sel" data-i="pins">
+      <div id="board">
+        <div class="bname silk" id="boardname">ESP32 DEV MODULE</div>
+        <div id="pins"></div>
+      </div>
+      <div class="legend">
+        <span><i style="border-color:var(--gold);background:var(--gold)"></i>
+          used in sketch</span>
+        <span><i style="border-color:var(--hot)"></i>needs care</span>
+      </div>
+      <div id="pindoc">
+        <h4>Pin map</h4>
+        Tap a pin for what it can do and what to watch out for. Pins your code
+        touches light up in gold as you type.
+      </div>
+    </div>
+
+    <div class="ipane" data-i="libs">
+      <div class="search">
+        <input id="libq" placeholder="search libraries" aria-label="Search libraries">
+        <button class="mini" id="libgo">Find</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="mini on" id="libtab-inst">Installed</button>
+        <button class="mini" id="libtab-find">Registry</button>
+      </div>
+      <div id="libresults"></div>
+    </div>
+
+    <div class="ipane" data-i="snips">
+      <div class="search">
+        <input id="snipq" placeholder="filter" aria-label="Filter snippets">
+      </div>
+      <div class="snipgrid" id="sniplist"></div>
+    </div>
+
+    <div class="ipane" data-i="board">
+      <div class="fields" id="boardopts"></div>
+      <div style="margin-top:14px;border-top:1px solid var(--trace);padding-top:12px">
+        <div class="silk" style="margin-bottom:8px">Tools</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="mini" id="btn-clean">Rebuild from scratch</button>
+          <button class="mini" id="btn-update">Update core and index</button>
+          <button class="mini danger" id="btn-erase">Erase whole flash</button>
+        </div>
+      </div>
+      <div style="margin-top:14px;border-top:1px solid var(--trace);padding-top:12px">
+        <div class="silk" style="margin-bottom:8px">Suggestions</div>
+        <label class="chk" style="margin-bottom:6px">
+          <input type="checkbox" id="cb-ghost" checked>Predict as I type</label>
+        <label class="chk" style="margin-bottom:6px">
+          <input type="checkbox" id="cb-acauto" checked>Open the list automatically</label>
+        <div class="hint" style="padding-left:0">Tab takes the whole grey
+          prediction, the right arrow takes one word.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- status strip -->
+  <div id="status">
+    <div class="cell clickable" id="st-board" title="Target board">
+      <span class="silk" style="color:var(--dim)">FQBN</span>
+      <b id="st-fqbn">esp32:esp32:esp32</b>
+    </div>
+    <div class="cell clickable" id="st-port" title="Serial port">
+      <span class="silk" style="color:var(--dim)">PORT</span>
+      <b id="st-portv">none</b>
+    </div>
+    <div class="cell" title="Program storage used">
+      <span class="silk" style="color:var(--dim)">FLASH</span>
+      <div class="bar"><i id="bar-flash"></i></div>
+      <b id="st-flash">&ndash;</b>
+    </div>
+    <div class="cell" title="Static RAM used">
+      <span class="silk" style="color:var(--dim)">RAM</span>
+      <div class="bar"><i id="bar-ram"></i></div>
+      <b id="st-ram">&ndash;</b>
+    </div>
+    <div class="cell" id="st-cursor">Ln 1, Col 1</div>
+    <div class="cell grow" id="st-msg">ready</div>
+  </div>
+</div>
+
+<div id="modal"><div id="mcard">
+  <header><h3 id="mtitle">Setup</h3><span class="grow"></span>
+    <button class="mini" id="mclose">Close</button></header>
+  <div class="mbody" id="mbody"></div>
+  <footer id="mfoot"></footer>
+</div></div>
+<div id="toast"></div>
+<script>
+/* ====================================================================
+   ESP32 API knowledge base.
+   Compact records: "label|signature|doc|return"
+   Aimed at arduino-esp32 core 3.x. Where 3.x changed an API the newer
+   form is listed first and the old one is marked legacy.
+   ==================================================================== */
+const P = (kind, rows) => rows.filter(Boolean).map(r => {
+  const [label, sig, doc, ret] = r.split('|');
+  return { label, sig: sig || '', doc: doc || '', ret: ret || '', kind };
+});
+
+const CORE = P('fn', [
+  "pinMode|pinMode(uint8_t pin, uint8_t mode)|Set a pin as INPUT, OUTPUT, INPUT_PULLUP or INPUT_PULLDOWN. Call it in setup().|void",
+  "digitalWrite|digitalWrite(uint8_t pin, uint8_t value)|Drive an output pin HIGH or LOW.|void",
+  "digitalRead|digitalRead(uint8_t pin)|Read a pin as HIGH or LOW.|int",
+  "analogRead|analogRead(uint8_t pin)|Read the ADC. Returns 0 to 4095 by default. ADC2 pins stop working while WiFi is on.|uint16_t",
+  "analogReadMilliVolts|analogReadMilliVolts(uint8_t pin)|Read the ADC already corrected to millivolts using the factory calibration. More accurate than scaling analogRead yourself.|uint32_t",
+  "analogWrite|analogWrite(uint8_t pin, uint32_t value)|Software PWM on any output pin, 0 to 255 by default.|void",
+  "analogReadResolution|analogReadResolution(uint8_t bits)|Set ADC resolution, 9 to 12 bits.|void",
+  "analogWriteResolution|analogWriteResolution(uint8_t pin, uint8_t bits)|Set the bit depth used by analogWrite on a pin.|void",
+  "analogSetAttenuation|analogSetAttenuation(adc_attenuation_t a)|Set the input range for every ADC pin. ADC_11db reads up to about 2.5V.|void",
+  "analogSetPinAttenuation|analogSetPinAttenuation(uint8_t pin, adc_attenuation_t a)|Set the input range for one ADC pin.|void",
+  "attachInterrupt|attachInterrupt(uint8_t pin, void (*fn)(void), int mode)|Run a function when a pin changes. Mark the handler IRAM_ATTR and keep it very short.|void",
+  "attachInterruptArg|attachInterruptArg(uint8_t pin, void (*fn)(void*), void* arg, int mode)|Interrupt handler that receives a pointer, handy for per pin state.|void",
+  "detachInterrupt|detachInterrupt(uint8_t pin)|Stop watching a pin for interrupts.|void",
+  "digitalPinToInterrupt|digitalPinToInterrupt(uint8_t pin)|Convert a pin number for attachInterrupt. On ESP32 it is the same number.|int",
+  "delay|delay(uint32_t ms)|Block for milliseconds. Yields to other tasks so WiFi keeps running.|void",
+  "delayMicroseconds|delayMicroseconds(uint32_t us)|Busy wait for microseconds. Does not yield.|void",
+  "millis|millis()|Milliseconds since boot. Rolls over after about 49 days.|uint32_t",
+  "micros|micros()|Microseconds since boot. Rolls over after about 71 minutes.|uint32_t",
+  "map|map(long x, long inMin, long inMax, long outMin, long outMax)|Rescale a number from one range to another.|long",
+  "constrain|constrain(x, low, high)|Clamp a value between two bounds.|",
+  "min|min(a, b)|The smaller of two values.|",
+  "max|max(a, b)|The larger of two values.|",
+  "abs|abs(x)|Absolute value.|",
+  "random|random(long min, long max)|Pseudo random number from min up to but not including max.|long",
+  "randomSeed|randomSeed(unsigned long seed)|Seed the generator. esp_random() is a better source on ESP32.|void",
+  "esp_random|esp_random()|True hardware random number.|uint32_t",
+  "pulseIn|pulseIn(uint8_t pin, uint8_t state, unsigned long timeout)|Measure a pulse width in microseconds. Used by HC-SR04 style sensors.|unsigned long",
+  "shiftOut|shiftOut(uint8_t data, uint8_t clock, uint8_t order, uint8_t val)|Clock a byte out one bit at a time, for shift registers.|void",
+  "tone|tone(uint8_t pin, unsigned int freq, unsigned long duration)|Square wave on a pin for buzzers.|void",
+  "noTone|noTone(uint8_t pin)|Stop the tone on a pin.|void",
+  "yield|yield()|Give time back to the scheduler inside a long loop.|void",
+  "ledcAttach|ledcAttach(uint8_t pin, uint32_t freq, uint8_t resolution)|Core 3.x hardware PWM. Attach a pin at a frequency and bit depth, then call ledcWrite with the pin.|bool",
+  "ledcAttachChannel|ledcAttachChannel(uint8_t pin, uint32_t freq, uint8_t res, uint8_t channel)|Hardware PWM on a chosen channel, for when channels must be shared.|bool",
+  "ledcWrite|ledcWrite(uint8_t pin, uint32_t duty)|Set the PWM duty on an attached pin. Range depends on the resolution you chose.|bool",
+  "ledcWriteTone|ledcWriteTone(uint8_t pin, uint32_t freq)|Output a fixed frequency at 50 percent duty.|uint32_t",
+  "ledcRead|ledcRead(uint8_t pin)|Read back the current duty.|uint32_t",
+  "ledcDetach|ledcDetach(uint8_t pin)|Release the PWM channel held by a pin.|bool",
+  "ledcSetup|ledcSetup(uint8_t ch, double freq, uint8_t bits)|Legacy 2.x PWM setup. Prefer ledcAttach on core 3.x.|double",
+  "ledcAttachPin|ledcAttachPin(uint8_t pin, uint8_t channel)|Legacy 2.x pairing of pin and PWM channel.|void",
+  "dacWrite|dacWrite(uint8_t pin, uint8_t value)|Real analog out, 0 to 255. Only GPIO25 and GPIO26 on the original ESP32 and S2.|void",
+  "touchRead|touchRead(uint8_t pin)|Read a capacitive touch pin. Reading rises when touched on S2 and S3, and falls on the original ESP32.|uint32_t",
+  "touchAttachInterrupt|touchAttachInterrupt(uint8_t pin, void (*fn)(void), uint32_t threshold)|Fire a callback when a touch pin crosses a threshold.|void",
+  "touchSleepWakeUpEnable|touchSleepWakeUpEnable(uint8_t pin, uint32_t threshold)|Wake from deep sleep on touch.|void",
+  "timerBegin|timerBegin(uint32_t frequency)|Core 3.x hardware timer. Pass the tick frequency, for example 1000000 for one microsecond ticks.|hw_timer_t*",
+  "timerAttachInterrupt|timerAttachInterrupt(hw_timer_t* timer, void (*fn)(void))|Attach an ISR to a hardware timer.|void",
+  "timerAlarm|timerAlarm(hw_timer_t* timer, uint64_t ticks, bool autoreload, uint64_t count)|Core 3.x alarm setup. Fires the ISR every given number of ticks.|void",
+  "timerWrite|timerWrite(hw_timer_t* timer, uint64_t val)|Set the timer counter.|void",
+  "timerEnd|timerEnd(hw_timer_t* timer)|Stop and free a hardware timer.|void",
+  "esp_sleep_enable_timer_wakeup|esp_sleep_enable_timer_wakeup(uint64_t us)|Wake from deep sleep after a number of microseconds.|esp_err_t",
+  "esp_sleep_enable_ext0_wakeup|esp_sleep_enable_ext0_wakeup(gpio_num_t pin, int level)|Wake from deep sleep when one RTC pin hits a level.|esp_err_t",
+  "esp_sleep_enable_ext1_wakeup|esp_sleep_enable_ext1_wakeup(uint64_t mask, esp_sleep_ext1_wakeup_mode_t mode)|Wake on any of several RTC pins. Build the mask with 1ULL shifted by the pin number.|esp_err_t",
+  "esp_deep_sleep_start|esp_deep_sleep_start()|Go to deep sleep now. Execution restarts at setup() on wake, RAM is lost apart from RTC_DATA_ATTR variables.|void",
+  "esp_light_sleep_start|esp_light_sleep_start()|Light sleep. Keeps RAM and resumes on the next line.|esp_err_t",
+  "esp_sleep_get_wakeup_cause|esp_sleep_get_wakeup_cause()|Find out what woke the chip.|esp_sleep_source_t",
+  "esp_restart|esp_restart()|Reboot the chip immediately.|void",
+  "esp_get_free_heap_size|esp_get_free_heap_size()|Free heap in bytes.|uint32_t",
+  "xTaskCreatePinnedToCore|xTaskCreatePinnedToCore(TaskFunction_t fn, const char* name, uint32_t stack, void* param, UBaseType_t prio, TaskHandle_t* handle, BaseType_t core)|Start a task on core 0 or core 1. Stack is in words, 4096 is a safe starting point.|BaseType_t",
+  "xTaskCreate|xTaskCreate(TaskFunction_t fn, const char* name, uint32_t stack, void* param, UBaseType_t prio, TaskHandle_t* handle)|Start a task and let the scheduler pick the core.|BaseType_t",
+  "vTaskDelay|vTaskDelay(TickType_t ticks)|Delay inside a task. Wrap milliseconds with pdMS_TO_TICKS.|void",
+  "vTaskDelete|vTaskDelete(TaskHandle_t task)|Kill a task. Pass NULL to end the current one.|void",
+  "xSemaphoreCreateMutex|xSemaphoreCreateMutex()|Make a mutex to guard data shared between tasks.|SemaphoreHandle_t",
+  "xSemaphoreTake|xSemaphoreTake(SemaphoreHandle_t s, TickType_t wait)|Claim a mutex, waiting up to a timeout.|BaseType_t",
+  "xSemaphoreGive|xSemaphoreGive(SemaphoreHandle_t s)|Release a mutex.|BaseType_t",
+  "xQueueCreate|xQueueCreate(UBaseType_t length, UBaseType_t itemSize)|Make a queue for passing values between tasks or out of an ISR.|QueueHandle_t",
+  "xQueueSend|xQueueSend(QueueHandle_t q, const void* item, TickType_t wait)|Put an item on a queue.|BaseType_t",
+  "xQueueReceive|xQueueReceive(QueueHandle_t q, void* buf, TickType_t wait)|Take an item off a queue, waiting if it is empty.|BaseType_t",
+  "pdMS_TO_TICKS|pdMS_TO_TICKS(ms)|Convert milliseconds to scheduler ticks.|TickType_t",
+  "esp_now_init|esp_now_init()|Start ESP-NOW. Set WiFi mode first.|esp_err_t",
+  "esp_now_add_peer|esp_now_add_peer(const esp_now_peer_info_t* peer)|Register a peer before sending to it.|esp_err_t",
+  "esp_now_send|esp_now_send(const uint8_t* mac, const uint8_t* data, size_t len)|Send up to 250 bytes to a peer, or to the broadcast address.|esp_err_t",
+  "esp_now_register_recv_cb|esp_now_register_recv_cb(esp_now_recv_cb_t cb)|Handle incoming ESP-NOW packets.|esp_err_t",
+  "esp_now_register_send_cb|esp_now_register_send_cb(esp_now_send_cb_t cb)|Learn whether a send was acknowledged.|esp_err_t",
+]);
+
+const MEMBERS = {
+  Stream: P('fn', [
+    "begin|begin(unsigned long baud)|Open the port at a baud rate. 115200 matches the bootloader messages.|void",
+    "print|print(value)|Write a value with no newline.|size_t",
+    "println|println(value)|Write a value followed by a newline.|size_t",
+    "printf|printf(const char* fmt, ...)|C style formatting. Use %d, %s, %f, %.2f, %u, %02X.|size_t",
+    "write|write(uint8_t b)|Send a raw byte.|size_t",
+    "available|available()|How many bytes are waiting to be read.|int",
+    "read|read()|Read one byte, or -1 if nothing is waiting.|int",
+    "readBytes|readBytes(char* buf, size_t len)|Read into a buffer until full or the timeout hits.|size_t",
+    "readString|readString()|Read everything waiting into a String.|String",
+    "readStringUntil|readStringUntil(char terminator)|Read up to a character, usually a newline. The terminator is consumed.|String",
+    "peek|peek()|Look at the next byte without taking it.|int",
+    "flush|flush()|Wait for outgoing bytes to leave.|void",
+    "parseInt|parseInt()|Pull the next integer out of the stream.|long",
+    "parseFloat|parseFloat()|Pull the next float out of the stream.|float",
+    "setTimeout|setTimeout(unsigned long ms)|How long the read helpers wait. Default is one second.|void",
+    "end|end()|Close the port.|void",
+    "availableForWrite|availableForWrite()|Free space in the transmit buffer.|int",
+    "setDebugOutput|setDebugOutput(bool on)|Send core log messages to this port.|void",
+    "setRxBufferSize|setRxBufferSize(size_t size)|Grow the receive buffer before begin() for fast streams.|size_t",
+    "onReceive|onReceive(void (*fn)(void), bool onlyOnTimeout)|Callback when bytes arrive, no polling needed.|void",
+  ]),
+  WiFiClass: P('fn', [
+    "begin|begin(const char* ssid, const char* password)|Join a network. Returns immediately, so poll status().|wl_status_t",
+    "status|status()|Connection state. Compare against WL_CONNECTED.|wl_status_t",
+    "mode|mode(wifi_mode_t m)|WIFI_STA to join a network, WIFI_AP to make one, WIFI_AP_STA for both, WIFI_OFF to save power.|bool",
+    "localIP|localIP()|The address the router handed out.|IPAddress",
+    "macAddress|macAddress()|This radio's MAC address as a String.|String",
+    "RSSI|RSSI()|Signal strength in dBm. Closer to zero is stronger, -70 is workable.|int8_t",
+    "SSID|SSID()|Name of the network you are on.|String",
+    "softAP|softAP(const char* ssid, const char* password)|Become an access point. The password needs eight characters or more.|bool",
+    "softAPIP|softAPIP()|Address of your own access point, usually 192.168.4.1.|IPAddress",
+    "softAPgetStationNum|softAPgetStationNum()|How many clients are joined to your access point.|uint8_t",
+    "scanNetworks|scanNetworks(bool async, bool showHidden)|Scan for networks and return the count.|int16_t",
+    "disconnect|disconnect(bool wifioff)|Leave the current network.|bool",
+    "reconnect|reconnect()|Try the last network again.|bool",
+    "setHostname|setHostname(const char* name)|Name this device shows as on the network. Call before begin().|bool",
+    "setSleep|setSleep(bool on)|Turn off modem sleep for steadier latency at the cost of power.|bool",
+    "setAutoReconnect|setAutoReconnect(bool on)|Rejoin automatically after a drop.|bool",
+    "onEvent|onEvent(WiFiEventCb cb)|React to connect, disconnect and got-IP events instead of polling.|void",
+    "channel|channel()|Current radio channel. ESP-NOW peers must share it.|int32_t",
+    "gatewayIP|gatewayIP()|The router address.|IPAddress",
+    "subnetMask|subnetMask()|Network mask.|IPAddress",
+    "dnsIP|dnsIP()|Configured DNS server.|IPAddress",
+    "config|config(IPAddress ip, IPAddress gw, IPAddress mask)|Use a static address instead of DHCP.|bool",
+    "isConnected|isConnected()|True when joined to a network.|bool",
+    "encryptionType|encryptionType(uint8_t i)|Security type of a scan result.|wifi_auth_mode_t",
+  ]),
+  ESPClass: P('fn', [
+    "getFreeHeap|getFreeHeap()|Free heap in bytes. Watch this to catch leaks.|uint32_t",
+    "getMinFreeHeap|getMinFreeHeap()|Lowest free heap since boot, the number that really matters.|uint32_t",
+    "getHeapSize|getHeapSize()|Total heap size.|uint32_t",
+    "getMaxAllocHeap|getMaxAllocHeap()|Largest block you could still allocate.|uint32_t",
+    "getChipModel|getChipModel()|Chip name, for example ESP32-S3.|const char*",
+    "getChipCores|getChipCores()|Number of CPU cores.|uint8_t",
+    "getChipRevision|getChipRevision()|Silicon revision.|uint8_t",
+    "getCpuFreqMHz|getCpuFreqMHz()|Current clock speed.|uint32_t",
+    "getSketchSize|getSketchSize()|Size of the running firmware.|uint32_t",
+    "getFreeSketchSpace|getFreeSketchSpace()|Room left in the partition, which caps an OTA update.|uint32_t",
+    "getEfuseMac|getEfuseMac()|Factory MAC as a 64 bit value, a decent unique device id.|uint64_t",
+    "getPsramSize|getPsramSize()|Total PSRAM, zero when the board has none or it is switched off.|size_t",
+    "getFreePsram|getFreePsram()|Free PSRAM in bytes.|size_t",
+    "restart|restart()|Reboot now.|void",
+    "getFlashChipSize|getFlashChipSize()|Size of the flash chip.|uint32_t",
+  ]),
+  HTTPClient: P('fn', [
+    "begin|begin(const char* url)|Point at a URL. For https pass a WiFiClientSecure as the first argument.|bool",
+    "GET|GET()|Send the request. Returns the status code, or a negative number on failure.|int",
+    "POST|POST(String body)|Send a POST with a body.|int",
+    "PUT|PUT(String body)|Send a PUT.|int",
+    "addHeader|addHeader(const char* name, const char* value)|Add a request header, for example Content-Type.|void",
+    "getString|getString()|Whole response body as a String. Watch memory on big payloads.|String",
+    "getStream|getStream()|Stream the body instead of buffering all of it.|WiFiClient&",
+    "getSize|getSize()|Content length, or -1 when the server does not say.|int",
+    "setTimeout|setTimeout(uint16_t ms)|How long to wait for the server.|void",
+    "setReuse|setReuse(bool on)|Keep the connection alive between requests.|void",
+    "end|end()|Release the connection. Always call this.|void",
+    "collectHeaders|collectHeaders(const char* keys[], size_t count)|Choose which response headers to keep.|void",
+    "header|header(const char* name)|Read a collected response header.|String",
+  ]),
+  WebServer: P('fn', [
+    "on|on(const String& uri, THandlerFunction fn)|Handle a path. Add HTTP_GET or HTTP_POST as the second argument to pin the method.|void",
+    "begin|begin()|Start listening on the port you passed to the constructor.|void",
+    "handleClient|handleClient()|Service pending requests. Call this every loop.|void",
+    "send|send(int code, const char* type, const String& body)|Reply, for example send(200, \"text/html\", page).|void",
+    "sendHeader|sendHeader(const String& name, const String& value)|Add a response header before send().|void",
+    "arg|arg(const String& name)|Read a query or form value.|String",
+    "hasArg|hasArg(const String& name)|True when that argument was sent.|bool",
+    "args|args()|Number of arguments received.|int",
+    "argName|argName(int i)|Name of argument i.|String",
+    "uri|uri()|The path that was requested.|String",
+    "method|method()|HTTP_GET, HTTP_POST and so on.|HTTPMethod",
+    "onNotFound|onNotFound(THandlerFunction fn)|Your 404 handler.|void",
+    "client|client()|The underlying client, for streaming replies.|WiFiClient&",
+    "serveStatic|serveStatic(const char* uri, fs::FS& fs, const char* path)|Serve files straight from LittleFS or SD.|void",
+    "stop|stop()|Shut the server down.|void",
+    "authenticate|authenticate(const char* user, const char* pass)|Check basic auth credentials.|bool",
+    "requestAuthentication|requestAuthentication()|Ask the browser for credentials.|void",
+  ]),
+  TwoWire: P('fn', [
+    "begin|begin(int sda, int scl, uint32_t freq)|Start I2C. On the original ESP32 the defaults are GPIO21 for SDA and GPIO22 for SCL.|bool",
+    "beginTransmission|beginTransmission(uint8_t address)|Start writing to a device at a 7 bit address.|void",
+    "write|write(uint8_t data)|Queue a byte for the current transmission.|size_t",
+    "endTransmission|endTransmission(bool stop)|Send the queued bytes. Returns 0 on success, 2 when nothing answered.|uint8_t",
+    "requestFrom|requestFrom(uint8_t address, size_t len)|Ask a device for bytes.|size_t",
+    "available|available()|Bytes left to read.|int",
+    "read|read()|Read the next byte.|int",
+    "setClock|setClock(uint32_t hz)|Bus speed, 100000 standard or 400000 fast.|bool",
+    "setPins|setPins(int sda, int scl)|Choose the pins before begin().|bool",
+  ]),
+  SPIClass: P('fn', [
+    "begin|begin(int8_t sck, int8_t miso, int8_t mosi, int8_t ss)|Start SPI on chosen pins. Defaults on the original ESP32 are 18, 19, 23 and 5.|void",
+    "beginTransaction|beginTransaction(SPISettings settings)|Claim the bus with a speed, bit order and mode.|void",
+    "transfer|transfer(uint8_t data)|Send a byte and get one back at the same time.|uint8_t",
+    "transfer16|transfer16(uint16_t data)|Exchange sixteen bits.|uint16_t",
+    "endTransaction|endTransaction()|Release the bus.|void",
+    "writeBytes|writeBytes(const uint8_t* data, uint32_t size)|Send a buffer, faster than a loop of transfer.|void",
+  ]),
+  Preferences: P('fn', [
+    "begin|begin(const char* name, bool readOnly)|Open a namespace in flash. Pass false when you plan to write.|bool",
+    "putInt|putInt(const char* key, int32_t value)|Save an integer that survives reboots.|size_t",
+    "getInt|getInt(const char* key, int32_t fallback)|Read an integer, with a value to use when the key is missing.|int32_t",
+    "putFloat|putFloat(const char* key, float value)|Save a float.|size_t",
+    "getFloat|getFloat(const char* key, float fallback)|Read a float.|float",
+    "putString|putString(const char* key, String value)|Save a string, handy for WiFi credentials.|size_t",
+    "getString|getString(const char* key, String fallback)|Read a string.|String",
+    "putBool|putBool(const char* key, bool value)|Save a flag.|size_t",
+    "getBool|getBool(const char* key, bool fallback)|Read a flag.|bool",
+    "isKey|isKey(const char* key)|True when the key exists.|bool",
+    "remove|remove(const char* key)|Delete one key.|bool",
+    "clear|clear()|Wipe the whole namespace.|bool",
+    "end|end()|Close the namespace and flush.|void",
+    "freeEntries|freeEntries()|Slots left in this namespace.|size_t",
+  ]),
+  FS: P('fn', [
+    "begin|begin(bool formatOnFail)|Mount the filesystem. Pass true so a blank chip formats itself.|bool",
+    "open|open(const char* path, const char* mode)|Open a file with \"r\", \"w\" or \"a\". Paths start with a slash.|File",
+    "exists|exists(const char* path)|True when the path is there.|bool",
+    "remove|remove(const char* path)|Delete a file.|bool",
+    "rename|rename(const char* from, const char* to)|Rename or move a file.|bool",
+    "mkdir|mkdir(const char* path)|Create a directory.|bool",
+    "totalBytes|totalBytes()|Size of the partition.|size_t",
+    "usedBytes|usedBytes()|Bytes in use.|size_t",
+    "format|format()|Erase everything on the partition.|bool",
+    "end|end()|Unmount.|void",
+  ]),
+  File: P('fn', [
+    "print|print(value)|Write text into the file.|size_t",
+    "println|println(value)|Write a line into the file.|size_t",
+    "write|write(uint8_t b)|Write a raw byte.|size_t",
+    "read|read()|Read one byte.|int",
+    "readStringUntil|readStringUntil(char end)|Read a line out of the file.|String",
+    "available|available()|Bytes left to read.|int",
+    "size|size()|File size in bytes.|size_t",
+    "seek|seek(uint32_t pos)|Jump to a position.|bool",
+    "name|name()|File name.|const char*",
+    "isDirectory|isDirectory()|True for directories.|bool",
+    "openNextFile|openNextFile()|Walk the entries of a directory.|File",
+    "close|close()|Close the file. Skipping this loses data.|void",
+  ]),
+  String: P('fn', [
+    "length|length()|Number of characters.|unsigned int",
+    "indexOf|indexOf(String value)|Position of the first match, or -1.|int",
+    "lastIndexOf|lastIndexOf(String value)|Position of the last match.|int",
+    "substring|substring(unsigned int from, unsigned int to)|A slice of the string.|String",
+    "toInt|toInt()|Parse an integer, 0 when it does not parse.|long",
+    "toFloat|toFloat()|Parse a float.|float",
+    "c_str|c_str()|Plain char pointer, needed by printf and most C APIs.|const char*",
+    "equals|equals(String other)|Exact comparison.|bool",
+    "equalsIgnoreCase|equalsIgnoreCase(String other)|Comparison ignoring case.|bool",
+    "startsWith|startsWith(String prefix)|True when it begins with prefix.|bool",
+    "endsWith|endsWith(String suffix)|True when it ends with suffix.|bool",
+    "trim|trim()|Strip whitespace at both ends, in place.|void",
+    "replace|replace(String find, String with)|Swap every occurrence, in place.|void",
+    "toUpperCase|toUpperCase()|Uppercase in place.|void",
+    "toLowerCase|toLowerCase()|Lowercase in place.|void",
+    "charAt|charAt(unsigned int i)|Character at an index.|char",
+    "isEmpty|isEmpty()|True when there are no characters.|bool",
+    "concat|concat(value)|Append to the end.|bool",
+  ]),
+  IPAddress: P('fn', [
+    "toString|toString()|Address as text, for example 192.168.1.42.|String",
+  ]),
+  WiFiClient: P('fn', [
+    "connect|connect(const char* host, uint16_t port)|Open a TCP connection.|int",
+    "connected|connected()|True while the socket is open.|uint8_t",
+    "print|print(value)|Send text.|size_t",
+    "println|println(value)|Send a line.|size_t",
+    "available|available()|Bytes waiting.|int",
+    "read|read()|Read a byte.|int",
+    "readStringUntil|readStringUntil(char end)|Read up to a character.|String",
+    "stop|stop()|Close the socket.|void",
+    "setNoDelay|setNoDelay(bool on)|Send small packets right away instead of batching.|void",
+  ]),
+  BLEServer: P('fn', [
+    "createService|createService(const char* uuid)|Add a GATT service.|BLEService*",
+    "setCallbacks|setCallbacks(BLEServerCallbacks* cb)|Get told when a phone connects or leaves.|void",
+    "getAdvertising|getAdvertising()|The advertising object, so you can start it.|BLEAdvertising*",
+    "getConnectedCount|getConnectedCount()|How many clients are connected.|uint32_t",
+    "startAdvertising|startAdvertising()|Start advertising again, usually after a disconnect.|void",
+    "disconnect|disconnect(uint16_t connId)|Drop a client.|void",
+  ]),
+  BLECharacteristic: P('fn', [
+    "setValue|setValue(std::string value)|Set the value a central will read.|void",
+    "getValue|getValue()|What a central last wrote.|std::string",
+    "notify|notify()|Push the current value to subscribed clients.|void",
+    "setCallbacks|setCallbacks(BLECharacteristicCallbacks* cb)|Get told about reads and writes.|void",
+    "addDescriptor|addDescriptor(BLEDescriptor* d)|Add a descriptor, for example a 0x2901 name.|void",
+  ]),
+  Servo: P('fn', [
+    "attach|attach(int pin, int min, int max)|Claim a pin for a servo, with optional pulse limits in microseconds.|int",
+    "write|write(int angle)|Move to an angle from 0 to 180.|void",
+    "writeMicroseconds|writeMicroseconds(int us)|Set the pulse width directly, around 500 to 2400.|void",
+    "read|read()|Last angle written.|int",
+    "detach|detach()|Release the pin and stop pulsing.|void",
+    "setPeriodHertz|setPeriodHertz(int hz)|Refresh rate, 50 for most hobby servos. ESP32Servo needs this before attach.|void",
+  ]),
+};
+
+// object name -> type, so member completion knows what to offer
+const OBJECTS = {
+  Serial: 'Stream', Serial1: 'Stream', Serial2: 'Stream', USBSerial: 'Stream',
+  WiFi: 'WiFiClass', ESP: 'ESPClass', Wire: 'TwoWire', Wire1: 'TwoWire',
+  SPI: 'SPIClass', LittleFS: 'FS', SPIFFS: 'FS', SD: 'FS', FFat: 'FS',
+};
+
+// declaration type -> member set, used when the sketch declares its own objects
+const TYPEMAP = {
+  WebServer: 'WebServer', HTTPClient: 'HTTPClient', Preferences: 'Preferences',
+  WiFiClient: 'WiFiClient', WiFiClientSecure: 'WiFiClient', String: 'String',
+  IPAddress: 'IPAddress', File: 'File', Servo: 'Servo', HardwareSerial: 'Stream',
+  BLEServer: 'BLEServer', BLECharacteristic: 'BLECharacteristic',
+  TwoWire: 'TwoWire', WiFiServer: 'WiFiClient', WiFiUDP: 'WiFiClient',
+};
+
+const CONSTANTS = P('cn', [
+  "HIGH||Logic high, 3.3V on an output.|",
+  "LOW||Logic low, ground.|",
+  "INPUT||Plain input with no pull resistor.|",
+  "OUTPUT||Push pull output.|",
+  "INPUT_PULLUP||Input held high until something pulls it down. What buttons to ground want.|",
+  "INPUT_PULLDOWN||Input held low. ESP32 has this in hardware, plain Arduino does not.|",
+  "LED_BUILTIN||The onboard LED pin for your board. Often GPIO2, and some boards have none.|",
+  "RISING||Interrupt on a low to high edge.|",
+  "FALLING||Interrupt on a high to low edge.|",
+  "CHANGE||Interrupt on either edge.|",
+  "WIFI_STA||Station mode, join someone else's network.|",
+  "WIFI_AP||Access point mode, be the network.|",
+  "WIFI_AP_STA||Both at once.|",
+  "WIFI_OFF||Radio off, the big power saving.|",
+  "WL_CONNECTED||WiFi.status() value that means you are on the network.|",
+  "WL_IDLE_STATUS||WiFi is not trying yet.|",
+  "WL_CONNECT_FAILED||The join attempt failed, often a wrong password.|",
+  "WL_NO_SSID_AVAIL||That network name was not found.|",
+  "SERIAL_8N1||Eight data bits, no parity, one stop bit. The usual framing.|",
+  "ADC_0db||No attenuation, ADC input range up to about 0.8V.|",
+  "ADC_2_5db||Range up to about 1.1V.|",
+  "ADC_6db||Range up to about 1.35V.|",
+  "ADC_11db||Range up to about 2.5V. This is the default.|",
+  "ESP_OK||An esp_err_t that means success.|",
+  "IRAM_ATTR||Put this on an interrupt handler so it lives in RAM and is safe to run from an ISR.|",
+  "RTC_DATA_ATTR||Put this on a variable so it survives deep sleep.|",
+  "portMUX_INITIALIZER_UNLOCKED||Starting value for a portMUX_TYPE spinlock shared with an ISR.|",
+  "HTTP_GET||WebServer method constant.|",
+  "HTTP_POST||WebServer method constant.|",
+  "M_PI||Pi.|",
+]);
+
+const KEYWORDS = ('void int uint8_t uint16_t uint32_t uint64_t int8_t int16_t ' +
+  'int32_t int64_t size_t bool char float double long short unsigned signed ' +
+  'const static volatile if else for while do switch case break continue ' +
+  'return struct class enum union typedef sizeof new delete this true false ' +
+  'NULL nullptr public private protected virtual override inline template ' +
+  'namespace using auto default extern goto register try catch throw ' +
+  'constexpr explicit friend mutable operator static_cast reinterpret_cast'
+  ).split(' ');
+
+const TYPEWORDS = ('String IPAddress WiFiClient WiFiClientSecure WiFiServer ' +
+  'WiFiUDP WebServer HTTPClient Preferences File TwoWire SPIClass SPISettings ' +
+  'hw_timer_t TaskHandle_t SemaphoreHandle_t QueueHandle_t portMUX_TYPE ' +
+  'esp_err_t gpio_num_t adc_attenuation_t wifi_mode_t wl_status_t Servo ' +
+  'BLEServer BLEService BLECharacteristic BLEAdvertising BLEDevice BLEScan ' +
+  'HardwareSerial Stream Print esp_now_peer_info_t uint8_t* Adafruit_NeoPixel'
+  ).split(' ');
+
+const HEADERS = P('hdr', [
+  "WiFi.h||Station and access point networking, plus WiFiClient sockets.|",
+  "WiFiClientSecure.h||TLS sockets for https requests.|",
+  "HTTPClient.h||Simple GET and POST requests.|",
+  "WebServer.h||A small blocking HTTP server. Needs handleClient() in loop().|",
+  "WiFiUdp.h||UDP sockets, used by NTP and OSC.|",
+  "ESPmDNS.h||Advertise a name so you can reach the board at name.local.|",
+  "ArduinoOTA.h||Upload new firmware over WiFi after the first USB flash.|",
+  "Update.h||The OTA update engine, for rolling your own updater.|",
+  "Wire.h||I2C for sensors and displays.|",
+  "SPI.h||SPI for displays, SD cards and radios.|",
+  "Preferences.h||Key and value storage in flash that survives reboots.|",
+  "LittleFS.h||A filesystem in flash. Prefer it over SPIFFS on new work.|",
+  "SPIFFS.h||The older flash filesystem, kept for existing projects.|",
+  "SD.h||SD cards over SPI.|",
+  "SD_MMC.h||SD cards over the faster SDMMC bus.|",
+  "FS.h||The base filesystem types.|",
+  "BLEDevice.h||Bluetooth Low Energy, the built in Bluedroid stack.|",
+  "BLEServer.h||GATT server pieces.|",
+  "BLEUtils.h||BLE helper functions.|",
+  "BLE2902.h||The notify descriptor for characteristics.|",
+  "esp_now.h||ESP-NOW, low latency board to board radio with no router.|",
+  "esp_sleep.h||Deep and light sleep controls.|",
+  "esp_system.h||Chip level helpers.|",
+  "esp_task_wdt.h||The task watchdog.|",
+  "driver/ledc.h||Low level PWM driver.|",
+  "driver/rmt.h||The RMT peripheral, used for IR and addressable LEDs.|",
+  "driver/i2s.h||I2S audio in and out.|",
+  "driver/adc.h||Low level ADC driver.|",
+  "Arduino.h||The Arduino core. Needed in .h and .cpp files but not in .ino.|",
+  "ArduinoJson.h||JSON parsing and building. Install from the registry.|",
+  "Adafruit_NeoPixel.h||WS2812 and similar addressable LEDs. Install from the registry.|",
+  "ESP32Servo.h||Servo control that plays nicely with the ESP32 PWM peripheral.|",
+  "Adafruit_SSD1306.h||The common 128x64 I2C OLED.|",
+  "DHT.h||DHT11 and DHT22 temperature and humidity sensors.|",
+  "OneWire.h||The 1-Wire bus, used by DS18B20.|",
+  "PubSubClient.h||MQTT client.|",
+  "FastLED.h||Addressable LED library with heavy effects support.|",
+]);
+
+/* ---------------- snippets ---------------- */
+/* $1, $2 are tab stops, $0 is where the caret lands last */
+const SNIPPETS = [
+  { label: 'wifi', title: 'Connect to WiFi', note: 'station mode with a timeout',
+    body: `#include <WiFi.h>
+
+const char* SSID = "\${1:your-network}";
+const char* PASS = "\${2:your-password}";
+
+bool connectWiFi(uint32_t timeoutMs = 15000) {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(SSID, PASS);
+  uint32_t start = millis();
+  while (WiFi.status() != WL_CONNECTED) {
+    if (millis() - start > timeoutMs) {
+      Serial.println("wifi timed out");
+      return false;
+    }
+    delay(250);
+    Serial.print(".");
+  }
+  Serial.printf("\\nconnected, ip %s, rssi %d dBm\\n",
+                WiFi.localIP().toString().c_str(), WiFi.RSSI());
+  return true;
+}$0` },
+
+  { label: 'ap', title: 'Become an access point', note: 'phone connects straight to the board',
+    body: `WiFi.mode(WIFI_AP);
+WiFi.softAP("\${1:esp32-setup}", "\${2:12345678}");
+Serial.print("join this network, then open http://");
+Serial.println(WiFi.softAPIP());$0` },
+
+  { label: 'webserver', title: 'Web server with routes', note: 'serves a page and a JSON endpoint',
+    body: `#include <WebServer.h>
+
+WebServer server(80);
+
+void handleRoot() {
+  server.send(200, "text/html",
+    "<h1>\${1:ESP32}</h1><p><a href='/state'>state</a></p>");
+}
+
+void handleState() {
+  char json[96];
+  snprintf(json, sizeof(json), "{\\"uptime\\":%lu,\\"heap\\":%u}",
+           millis() / 1000, ESP.getFreeHeap());
+  server.send(200, "application/json", json);
+}
+
+void startServer() {
+  server.on("/", handleRoot);
+  server.on("/state", handleState);
+  server.onNotFound([]() { server.send(404, "text/plain", "no such path"); });
+  server.begin();
+}
+
+// call server.handleClient() every time through loop()$0` },
+
+  { label: 'http', title: 'HTTP GET request', note: 'fetch a URL and read the body',
+    body: `#include <HTTPClient.h>
+
+String fetch(const char* url) {
+  HTTPClient http;
+  http.begin(url);
+  http.setTimeout(5000);
+  int code = http.GET();
+  String body = (code > 0) ? http.getString() : String();
+  if (code != 200) Serial.printf("http %d\\n", code);
+  http.end();
+  return body;
+}$0` },
+
+  { label: 'ota', title: 'Over the air updates', note: 'flash over WiFi after the first USB upload',
+    body: `#include <ArduinoOTA.h>
+
+void startOTA(const char* host = "\${1:esp32}") {
+  ArduinoOTA.setHostname(host);
+  ArduinoOTA.onStart([]() { Serial.println("ota starting"); });
+  ArduinoOTA.onProgress([](unsigned int done, unsigned int total) {
+    Serial.printf("ota %u%%\\r", done * 100 / total);
+  });
+  ArduinoOTA.onError([](ota_error_t e) { Serial.printf("ota error %u\\n", e); });
+  ArduinoOTA.begin();
+}
+
+// call ArduinoOTA.handle() every time through loop()$0` },
+
+  { label: 'sleep', title: 'Deep sleep on a timer', note: 'wakes up and runs setup again',
+    body: `#define uS_PER_S 1000000ULL
+RTC_DATA_ATTR int bootCount = 0;   // survives deep sleep
+
+void sleepFor(uint64_t seconds) {
+  Serial.printf("sleeping %llu s, boot count %d\\n", seconds, ++bootCount);
+  Serial.flush();
+  esp_sleep_enable_timer_wakeup(seconds * uS_PER_S);
+  esp_deep_sleep_start();          // nothing after this line runs
+}$0` },
+
+  { label: 'sleepbutton', title: 'Wake from sleep on a button', note: 'ext0 wake on an RTC pin',
+    body: `const gpio_num_t WAKE_PIN = GPIO_NUM_\${1:33};
+
+void sleepUntilPress() {
+  pinMode(WAKE_PIN, INPUT_PULLUP);
+  esp_sleep_enable_ext0_wakeup(WAKE_PIN, 0);   // 0 means wake when pulled low
+  Serial.flush();
+  esp_deep_sleep_start();
+}
+
+void reportWakeReason() {
+  switch (esp_sleep_get_wakeup_cause()) {
+    case ESP_SLEEP_WAKEUP_EXT0:  Serial.println("woke on the button"); break;
+    case ESP_SLEEP_WAKEUP_TIMER: Serial.println("woke on the timer"); break;
+    default:                     Serial.println("normal power on"); break;
+  }
+}$0` },
+
+  { label: 'i2cscan', title: 'I2C scanner', note: 'find the address of a sensor',
+    body: `#include <Wire.h>
+
+void scanI2C() {
+  Wire.begin(\${1:21}, \${2:22});
+  Serial.println("scanning I2C");
+  int found = 0;
+  for (uint8_t addr = 1; addr < 127; addr++) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() == 0) {
+      Serial.printf("  device at 0x%02X\\n", addr);
+      found++;
+    }
+  }
+  Serial.printf("%d device(s)\\n", found);
+}$0` },
+
+  { label: 'pwm', title: 'Hardware PWM fade', note: 'core 3.x ledcAttach',
+    body: `const int PWM_PIN = \${1:5};
+const int PWM_HZ   = 5000;
+const int PWM_BITS = 12;           // duty runs 0 to 4095
+
+void setupPWM() {
+  ledcAttach(PWM_PIN, PWM_HZ, PWM_BITS);
+}
+
+void fadeOnce(uint16_t stepDelay = 3) {
+  const int top = (1 << PWM_BITS) - 1;
+  for (int d = 0; d <= top; d += 16) { ledcWrite(PWM_PIN, d); delay(stepDelay); }
+  for (int d = top; d >= 0; d -= 16) { ledcWrite(PWM_PIN, d); delay(stepDelay); }
+}$0` },
+
+  { label: 'button', title: 'Button with debounce', note: 'interrupt plus a time guard',
+    body: `const int BTN = \${1:0};
+volatile uint32_t lastPress = 0;
+volatile bool pressed = false;
+
+void IRAM_ATTR onPress() {
+  uint32_t now = millis();
+  if (now - lastPress > 40) {     // ignore contact bounce
+    lastPress = now;
+    pressed = true;
+  }
+}
+
+void setupButton() {
+  pinMode(BTN, INPUT_PULLUP);
+  attachInterrupt(BTN, onPress, FALLING);
+}
+
+// in loop(): if (pressed) { pressed = false; /* handle it */ }$0` },
+
+  { label: 'timer', title: 'Non blocking timer', note: 'millis instead of delay',
+    body: `uint32_t lastRun = 0;
+const uint32_t INTERVAL = \${1:1000};
+
+void loop() {
+  uint32_t now = millis();
+  if (now - lastRun >= INTERVAL) {
+    lastRun = now;
+    \${2:// runs every INTERVAL ms without blocking anything else}
+  }
+}$0` },
+
+  { label: 'hwtimer', title: 'Hardware timer interrupt', note: 'core 3.x timerAlarm',
+    body: `hw_timer_t* timer = nullptr;
+volatile uint32_t ticks = 0;
+portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+
+void IRAM_ATTR onTimer() {
+  portENTER_CRITICAL_ISR(&mux);
+  ticks++;
+  portEXIT_CRITICAL_ISR(&mux);
+}
+
+void setupTimer() {
+  timer = timerBegin(1000000);              // one tick per microsecond
+  timerAttachInterrupt(timer, &onTimer);
+  timerAlarm(timer, \${1:1000}, true, 0);      // fire every 1000 ticks
+}$0` },
+
+  { label: 'task', title: 'Task on the other core', note: 'FreeRTOS, keeps loop() free',
+    body: `void workerTask(void* param) {
+  for (;;) {
+    \${1:// heavy work lives here}
+    vTaskDelay(pdMS_TO_TICKS(100));         // always yield in a task
+  }
+}
+
+void startWorker() {
+  xTaskCreatePinnedToCore(workerTask, "worker", 4096, nullptr, 1, nullptr, 0);
+}$0` },
+
+  { label: 'prefs', title: 'Save settings to flash', note: 'Preferences, survives power loss',
+    body: `#include <Preferences.h>
+
+Preferences prefs;
+
+void saveSettings(int value) {
+  prefs.begin("\${1:app}", false);
+  prefs.putInt("count", value);
+  prefs.end();
+}
+
+int loadSettings() {
+  prefs.begin("\${1:app}", true);
+  int value = prefs.getInt("count", 0);
+  prefs.end();
+  return value;
+}$0` },
+
+  { label: 'littlefs', title: 'Read and write a file', note: 'LittleFS in flash',
+    body: `#include <LittleFS.h>
+
+void fsDemo() {
+  if (!LittleFS.begin(true)) {      // true formats a blank chip
+    Serial.println("mount failed");
+    return;
+  }
+  File f = LittleFS.open("/log.txt", "a");
+  f.printf("uptime %lu\\n", millis());
+  f.close();
+
+  f = LittleFS.open("/log.txt", "r");
+  while (f.available()) Serial.println(f.readStringUntil('\\n'));
+  f.close();
+  Serial.printf("%u of %u bytes used\\n",
+                LittleFS.usedBytes(), LittleFS.totalBytes());
+}$0` },
+
+  { label: 'bleserver', title: 'BLE server that notifies', note: 'a phone can subscribe',
+    body: `#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+
+#define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CHAR_UUID    "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+
+BLECharacteristic* chr = nullptr;
+bool clientConnected = false;
+
+class ServerCB : public BLEServerCallbacks {
+  void onConnect(BLEServer*) override { clientConnected = true; }
+  void onDisconnect(BLEServer* s) override {
+    clientConnected = false;
+    s->startAdvertising();
+  }
+};
+
+void startBLE() {
+  BLEDevice::init("\${1:ESP32-Node}");
+  BLEServer* server = BLEDevice::createServer();
+  server->setCallbacks(new ServerCB());
+  BLEService* svc = server->createService(SERVICE_UUID);
+  chr = svc->createCharacteristic(CHAR_UUID,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+  chr->addDescriptor(new BLE2902());
+  svc->start();
+  BLEDevice::startAdvertising();
+  Serial.println("advertising");
+}
+
+void pushValue(int v) {
+  if (!clientConnected || !chr) return;
+  chr->setValue(String(v).c_str());
+  chr->notify();
+}$0` },
+
+  { label: 'blescan', title: 'Scan for BLE devices', note: 'lists names and signal strength',
+    body: `#include <BLEDevice.h>
+#include <BLEScan.h>
+#include <BLEAdvertisedDevice.h>
+
+void scanBLE(uint32_t seconds = 5) {
+  BLEDevice::init("");
+  BLEScan* scan = BLEDevice::getScan();
+  scan->setActiveScan(true);
+  BLEScanResults* found = scan->start(seconds, false);
+  for (int i = 0; i < found->getCount(); i++) {
+    BLEAdvertisedDevice d = found->getDevice(i);
+    Serial.printf("%s  %s  %d dBm\\n",
+                  d.getAddress().toString().c_str(),
+                  d.getName().c_str(), d.getRSSI());
+  }
+  scan->clearResults();
+}$0` },
+
+  { label: 'espnow', title: 'ESP-NOW send and receive', note: 'board to board with no router',
+    body: `#include <WiFi.h>
+#include <esp_now.h>
+
+uint8_t peerMac[6] = { 0x\${1:FF}, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+
+typedef struct { uint32_t seq; float value; } Packet;
+
+void onRecv(const esp_now_recv_info_t* info, const uint8_t* data, int len) {
+  if (len != sizeof(Packet)) return;
+  Packet p;
+  memcpy(&p, data, sizeof(p));
+  Serial.printf("seq %u value %.2f\\n", p.seq, p.value);
+}
+
+void startEspNow() {
+  WiFi.mode(WIFI_STA);
+  if (esp_now_init() != ESP_OK) { Serial.println("esp-now failed"); return; }
+  esp_now_register_recv_cb(onRecv);
+  esp_now_peer_info_t peer = {};
+  memcpy(peer.peer_addr, peerMac, 6);
+  peer.channel = 0;
+  peer.encrypt = false;
+  esp_now_add_peer(&peer);
+  Serial.print("my mac is ");
+  Serial.println(WiFi.macAddress());
+}
+
+void sendPacket(float value) {
+  static uint32_t seq = 0;
+  Packet p = { seq++, value };
+  esp_now_send(peerMac, (uint8_t*)&p, sizeof(p));
+}$0` },
+
+  { label: 'cli', title: 'Serial command parser', note: 'type commands into the monitor',
+    body: `String line;
+
+void handleCommand(const String& cmd) {
+  if (cmd == "help") {
+    Serial.println("commands: help, info, on, off");
+  } else if (cmd == "info") {
+    Serial.printf("%s, %u kB free, up %lu s\\n", ESP.getChipModel(),
+                  ESP.getFreeHeap() / 1024, millis() / 1000);
+  } else if (cmd.startsWith("on")) {
+    digitalWrite(\${1:2}, HIGH);
+  } else if (cmd.startsWith("off")) {
+    digitalWrite(\${1:2}, LOW);
+  } else if (cmd.length()) {
+    Serial.printf("unknown command: %s\\n", cmd.c_str());
+  }
+}
+
+void pollSerial() {
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\\n' || c == '\\r') {
+      line.trim();
+      if (line.length()) handleCommand(line);
+      line = "";
+    } else {
+      line += c;
+    }
+  }
+}$0` },
+
+  { label: 'adc', title: 'Steady analog reading', note: 'averaging plus the right range',
+    body: `const int SENSE_PIN = \${1:34};
+
+void setupAdc() {
+  analogReadResolution(12);
+  analogSetPinAttenuation(SENSE_PIN, ADC_11db);  // up to about 2.5V
+}
+
+float readVolts(uint8_t samples = 16) {
+  uint32_t sum = 0;
+  for (uint8_t i = 0; i < samples; i++) {
+    sum += analogReadMilliVolts(SENSE_PIN);
+    delayMicroseconds(200);
+  }
+  return sum / samples / 1000.0f;
+}$0` },
+
+  { label: 'touch', title: 'Capacitive touch pad', note: 'a wire or a pad of foil is enough',
+    body: `const int TOUCH_PIN = \${1:4};
+uint32_t baseline = 0;
+
+void calibrateTouch() {
+  uint32_t sum = 0;
+  for (int i = 0; i < 32; i++) { sum += touchRead(TOUCH_PIN); delay(5); }
+  baseline = sum / 32;
+  Serial.printf("touch baseline %u\\n", baseline);
+}
+
+bool isTouched() {
+  uint32_t now = touchRead(TOUCH_PIN);
+  // the original ESP32 reads lower when touched, S2 and S3 read higher
+  return now < baseline * 0.7 || now > baseline * 1.3;
+}$0` },
+
+  { label: 'neopixel', title: 'Addressable LED strip', note: 'needs the Adafruit NeoPixel library',
+    body: `#include <Adafruit_NeoPixel.h>
+
+const int LED_PIN = \${1:5};
+const int COUNT   = \${2:16};
+Adafruit_NeoPixel strip(COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+void setupStrip() {
+  strip.begin();
+  strip.setBrightness(60);      // full brightness pulls a lot of current
+  strip.show();
+}
+
+void sweep(uint8_t r, uint8_t g, uint8_t b, uint16_t wait = 40) {
+  for (int i = 0; i < COUNT; i++) {
+    strip.setPixelColor(i, strip.Color(r, g, b));
+    strip.show();
+    delay(wait);
+  }
+}$0` },
+
+  { label: 'chipinfo', title: 'Print chip and memory info', note: 'good first thing in setup',
+    body: `void printChipInfo() {
+  Serial.printf("chip     %s rev %d, %d core(s) at %u MHz\\n",
+                ESP.getChipModel(), ESP.getChipRevision(),
+                ESP.getChipCores(), ESP.getCpuFreqMHz());
+  Serial.printf("flash    %u kB, sketch uses %u kB\\n",
+                ESP.getFlashChipSize() / 1024, ESP.getSketchSize() / 1024);
+  Serial.printf("heap     %u kB free of %u kB\\n",
+                ESP.getFreeHeap() / 1024, ESP.getHeapSize() / 1024);
+  if (ESP.getPsramSize()) Serial.printf("psram    %u kB\\n", ESP.getPsramSize() / 1024);
+  Serial.print("mac      "); Serial.println(WiFi.macAddress());
+}$0` },
+
+  { label: 'blink', title: 'Blink without delay', note: 'the honest starting point',
+    body: `const int LED = \${1:2};
+uint32_t lastToggle = 0;
+bool state = false;
+
+void loop() {
+  if (millis() - lastToggle >= \${2:500}) {
+    lastToggle = millis();
+    state = !state;
+    digitalWrite(LED, state);
+  }
+}$0` },
+
+  { label: 'plot', title: 'Print values for the plotter', note: 'labelled series the plot tab can chart',
+    body: `void plotValues(float a, float b) {
+  Serial.printf("%.3f,%.3f\\n", a, b);   // one line, values separated by commas
+}$0` },
+];
+
+/* ---------------- pin maps ---------------- */
+function buildPins(family) {
+  const S = a => new Set(a);
+  const spec = {
+    esp32: {
+      name: 'ESP32', all: [...Array(40).keys()],
+      skip: S([20, 24, 28, 29, 30, 31]),
+      inputOnly: S([34, 35, 36, 37, 38, 39]),
+      flash: S([6, 7, 8, 9, 10, 11]),
+      adc1: S([32, 33, 34, 35, 36, 37, 38, 39]),
+      adc2: S([0, 2, 4, 12, 13, 14, 15, 25, 26, 27]),
+      touch: S([0, 2, 4, 12, 13, 14, 15, 27, 32, 33]),
+      dac: S([25, 26]), strap: S([0, 2, 5, 12, 15]),
+      rtc: S([0, 2, 4, 12, 13, 14, 15, 25, 26, 27, 32, 33, 34, 35, 36, 37, 38, 39]),
+      def: { 21: 'I2C SDA', 22: 'I2C SCL', 18: 'SPI SCK', 19: 'SPI MISO',
+             23: 'SPI MOSI', 5: 'SPI SS', 1: 'UART0 TX', 3: 'UART0 RX' },
+    },
+    esp32s3: {
+      name: 'ESP32-S3', all: [...Array(49).keys()],
+      skip: S([22, 23, 24, 25]),
+      inputOnly: S([]), flash: S([26, 27, 28, 29, 30, 31, 32]),
+      psram: S([33, 34, 35, 36, 37]),
+      adc1: S([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+      adc2: S([11, 12, 13, 14, 15, 16, 17, 18, 19, 20]),
+      touch: S([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]),
+      dac: S([]), strap: S([0, 3, 45, 46]), usb: S([19, 20]),
+      rtc: S([...Array(22).keys()]),
+      def: { 8: 'I2C SDA', 9: 'I2C SCL', 43: 'UART0 TX', 44: 'UART0 RX' },
+    },
+    esp32s2: {
+      name: 'ESP32-S2', all: [...Array(47).keys()],
+      skip: S([22, 23, 24, 25, 47, 48]),
+      inputOnly: S([46]), flash: S([26, 27, 28, 29, 30, 31, 32]),
+      adc1: S([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+      adc2: S([11, 12, 13, 14, 15, 16, 17, 18, 19, 20]),
+      touch: S([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]),
+      dac: S([17, 18]), strap: S([0, 45, 46]), usb: S([19, 20]),
+      rtc: S([...Array(22).keys()]),
+      def: { 8: 'I2C SDA', 9: 'I2C SCL', 43: 'UART0 TX', 44: 'UART0 RX' },
+    },
+    esp32c3: {
+      name: 'ESP32-C3', all: [...Array(22).keys()],
+      skip: S([]), inputOnly: S([]), flash: S([11, 12, 13, 14, 15, 16, 17]),
+      adc1: S([0, 1, 2, 3, 4]), adc2: S([5]),
+      touch: S([]), dac: S([]), strap: S([2, 8, 9]), usb: S([18, 19]),
+      rtc: S([0, 1, 2, 3, 4, 5]),
+      def: { 8: 'I2C SDA', 9: 'I2C SCL', 21: 'UART0 TX', 20: 'UART0 RX' },
+    },
+    esp32c6: {
+      name: 'ESP32-C6', all: [...Array(31).keys()],
+      skip: S([]), inputOnly: S([]), flash: S([24, 25, 26, 27, 28, 29, 30]),
+      adc1: S([0, 1, 2, 3, 4, 5, 6]), adc2: S([]),
+      touch: S([]), dac: S([]), strap: S([4, 5, 8, 9, 15]), usb: S([12, 13]),
+      rtc: S([0, 1, 2, 3, 4, 5, 6, 7]),
+      def: { 6: 'I2C SDA', 7: 'I2C SCL', 16: 'UART0 TX', 17: 'UART0 RX' },
+    },
+  }[family] || null;
+  if (!spec) return { name: family, pins: [] };
+
+  const pins = [];
+  for (const n of spec.all) {
+    if (spec.skip.has(n)) continue;
+    const tags = [], notes = [];
+    let warn = false;
+    if (spec.flash.has(n)) {
+      tags.push('flash'); warn = true;
+      notes.push('Wired to the SPI flash chip. Using it will crash the board.');
+    }
+    if (spec.psram && spec.psram.has(n)) {
+      tags.push('psram'); warn = true;
+      notes.push('Used by octal PSRAM on modules that have it. Free on others.');
+    }
+    if (spec.inputOnly.has(n)) {
+      tags.push('input only'); warn = true;
+      notes.push('Input only. No output, no pull up and no pull down resistor.');
+    }
+    if (spec.adc1.has(n)) { tags.push('ADC1'); notes.push('ADC1 keeps working while WiFi is on.'); }
+    if (spec.adc2.has(n)) {
+      tags.push('ADC2'); warn = true;
+      notes.push('ADC2 stops reading once WiFi starts. Move the sensor to an ADC1 pin.');
+    }
+    if (spec.touch.has(n)) { tags.push('touch'); notes.push('Capacitive touch capable.'); }
+    if (spec.dac.has(n)) { tags.push('DAC'); notes.push('Real analog output through dacWrite().'); }
+    if (spec.rtc.has(n)) { tags.push('RTC'); notes.push('Can wake the chip from deep sleep.'); }
+    if (spec.usb && spec.usb.has(n)) {
+      tags.push('USB'); warn = true;
+      notes.push('Part of the native USB pair. Taking it can break the USB connection.');
+    }
+    if (spec.strap.has(n)) {
+      tags.push('strapping'); warn = true;
+      notes.push('Read at boot to pick the boot mode. A pull up or pull down here can stop the board starting.');
+    }
+    if (spec.def[n]) { tags.push(spec.def[n]); notes.push('Default pin for ' + spec.def[n] + '.'); }
+    if (!spec.inputOnly.has(n) && !spec.flash.has(n)) tags.push('PWM');
+    pins.push({ n, tags, notes, warn, io: spec.inputOnly.has(n) ? 'in' : 'io' });
+  }
+  return { name: spec.name, pins };
+}
+
+function familyFor(fqbn) {
+  const f = (fqbn || '').toLowerCase();
+  if (/s3|esp32s3/.test(f)) return 'esp32s3';
+  if (/s2|esp32s2/.test(f)) return 'esp32s2';
+  if (/c6|esp32c6/.test(f)) return 'esp32c6';
+  if (/c3|esp32c3/.test(f)) return 'esp32c3';
+  if (/h2|esp32h2/.test(f)) return 'esp32c6';
+  return 'esp32';
+}
+</script>
+<script>
+/* ====================================================================
+   Editor engine
+   ==================================================================== */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+const ta = $('#ta'), hl = $('#hl'), ghost = $('#ghost'), gutter = $('#gutter'),
+      scroll = $('#scroll'), layers = $('#layers'), acBox = $('#ac'),
+      acList = $('#aclist'), acDoc = $('#acdoc'), sigBox = $('#sighelp'),
+      curline = $('#curline');
+
+const marks = document.createElement('div');
+marks.id = 'marks';
+marks.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:0';
+layers.insertBefore(marks, hl);
+
+let charW = 7.8, lineH = 20.2, padL = 12, padT = 10;
+
+function measure() {
+  const probe = document.createElement('span');
+  probe.textContent = 'M'.repeat(80);
+  probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;' +
+    'font:' + getComputedStyle(ta).font;
+  document.body.appendChild(probe);
+  charW = probe.getBoundingClientRect().width / 80;
+  probe.remove();
+  const cs = getComputedStyle(hl);
+  lineH = parseFloat(cs.lineHeight);
+  padL = parseFloat(cs.paddingLeft);
+  padT = parseFloat(cs.paddingTop);
+}
+
+/* ---------------- tokenizer ---------------- */
+const KWSET = new Set(KEYWORDS), TYSET = new Set(TYPEWORDS);
+const APISET = new Set([...CORE.map(x => x.label), ...Object.keys(OBJECTS)]);
+const CNSET = new Set(CONSTANTS.map(x => x.label));
+
+function tokenize(line, inBlock) {
+  const out = [];
+  let i = 0, n = line.length;
+  if (inBlock) {
+    const end = line.indexOf('*/');
+    if (end === -1) return { html: '<span class="t-cm">' + esc(line) + '</span>', block: true };
+    out.push(['cm', line.slice(0, end + 2)]);
+    i = end + 2;
+  }
+  while (i < n) {
+    const c = line[i], two = line.substr(i, 2);
+    if (two === '//') { out.push(['cm', line.slice(i)]); i = n; continue; }
+    if (two === '/*') {
+      const end = line.indexOf('*/', i + 2);
+      if (end === -1) { out.push(['cm', line.slice(i)]); i = n; inBlock = true; continue; }
+      out.push(['cm', line.slice(i, end + 2)]); i = end + 2; continue;
+    }
+    if (c === '#' && !out.some(t => t[1].trim())) {
+      const m = /^#\s*\w+/.exec(line.slice(i));
+      out.push(['pp', m ? m[0] : c]); i += m ? m[0].length : 1; continue;
+    }
+    if (c === '"' || c === "'" || c === '<' && /#\s*include/.test(line)) {
+      if (c === '<') {
+        const end = line.indexOf('>', i);
+        if (end > -1) { out.push(['st', line.slice(i, end + 1)]); i = end + 1; continue; }
+      } else {
+        let j = i + 1;
+        while (j < n && line[j] !== c) { if (line[j] === '\\') j++; j++; }
+        out.push(['st', line.slice(i, Math.min(j + 1, n))]); i = j + 1; continue;
+      }
+    }
+    if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(line[i + 1] || ''))) {
+      const m = /^(0[xX][0-9a-fA-F]+|0[bB][01]+|[0-9]*\.?[0-9]+([eE][+-]?[0-9]+)?)[uUlLfF]*/
+        .exec(line.slice(i));
+      out.push(['nu', m[0]]); i += m[0].length; continue;
+    }
+    if (/[A-Za-z_]/.test(c)) {
+      const m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(line.slice(i));
+      const w = m[0];
+      let k = 'id';
+      if (KWSET.has(w)) k = 'kw';
+      else if (TYSET.has(w)) k = 'ty';
+      else if (CNSET.has(w) || /^[A-Z][A-Z0-9_]{2,}$/.test(w)) k = 'cn';
+      else if (APISET.has(w)) k = 'api';
+      else if (line[i + w.length] === '(' ||
+               /^\s*\(/.test(line.slice(i + w.length))) k = 'fn';
+      out.push([k === 'id' ? '' : k, w]); i += w.length; continue;
+    }
+    if (/[{}()[\];,.<>=!+\-*/%&|^~?:]/.test(c)) { out.push(['op', c]); i++; continue; }
+    out.push(['', c]); i++;
+  }
+  const html = out.map(([k, t]) => k ? '<span class="t-' + k + '">' + esc(t) + '</span>'
+                                     : esc(t)).join('');
+  return { html, block: inBlock };
+}
+
+/* ---------------- document model ---------------- */
+const St = {
+  sketch: null, files: {}, active: '', dirty: new Set(),
+  diags: [], marksOn: true, ghostOn: true, acAuto: true,
+  ghostText: '', ghostAt: -1, snipStops: [], snipEnd: -1,
+  findMatches: [], findIdx: 0, blockState: [],
+};
+
+function text() { return ta.value; }
+function lines() { return ta.value.split('\n'); }
+
+function render() {
+  const ls = lines();
+  let inBlock = false, out = [], gut = [];
+  const cur = lineOf(ta.selectionStart);
+  const byLine = {};
+  for (const d of St.diags) {
+    if (d.file && St.active && d.file !== St.active) continue;
+    (byLine[d.line] = byLine[d.line] || []).push(d);
+  }
+  for (let i = 0; i < ls.length; i++) {
+    const r = tokenize(ls[i], inBlock);
+    inBlock = r.block;
+    out.push(r.html || ' ');
+    const ds = byLine[i + 1];
+    const cls = 'g' + (i === cur ? ' cur' : '') +
+      (ds ? (ds.some(d => d.severity === 'error') ? ' err' : ' warn') : '');
+    gut.push('<div class="' + cls + '">' + (i + 1) + '</div>');
+  }
+  hl.innerHTML = out.join('\n');
+  gutter.innerHTML = gut.join('');
+  const w = Math.max(...ls.map(l => l.length), 40) * charW + padL + 40;
+  layers.style.width = w + 'px';
+  layers.style.height = (ls.length * lineH + padT + 60) + 'px';
+  ta.style.height = layers.style.height;
+  ta.style.width = w + 'px';
+  hl.style.minWidth = w + 'px';
+  drawMarks(byLine);
+  drawCurline();
+  syncGutter();
+}
+
+function drawMarks(byLine) {
+  const ls = lines(), frag = [];
+  for (const ln in byLine) {
+    const i = +ln - 1;
+    if (i < 0 || i >= ls.length) continue;
+    for (const d of byLine[ln]) {
+      const col = Math.max(0, (d.col || 1) - 1);
+      const rest = ls[i].slice(col);
+      const m = /^[A-Za-z_][A-Za-z0-9_]*|^./.exec(rest);
+      const len = Math.max(m ? m[0].length : 1, 1);
+      frag.push('<div style="position:absolute;left:' + (padL + col * charW) +
+        'px;top:' + (padT + i * lineH) + 'px;width:' + (len * charW) +
+        'px;height:' + lineH + 'px" class="' +
+        (d.severity === 'error' ? 'err-underline' : 'warn-underline') + '"></div>');
+    }
+  }
+  for (const m of St.findMatches) {
+    const p = posToLC(m);
+    frag.push('<div style="position:absolute;left:' + (padL + p.col * charW) +
+      'px;top:' + (padT + p.line * lineH + 1) + 'px;width:' +
+      (St.findLen * charW) + 'px;height:' + (lineH - 2) +
+      'px;background:rgba(98,182,216,.22);border:1px solid rgba(98,182,216,.5);' +
+      'border-radius:2px"></div>');
+  }
+  marks.innerHTML = frag.join('');
+}
+
+function drawCurline() {
+  const l = lineOf(ta.selectionStart);
+  curline.style.top = (padT + l * lineH) + 'px';
+  curline.style.height = lineH + 'px';
+}
+
+function syncGutter() { gutter.scrollTop = scroll.scrollTop; }
+
+function lineOf(pos) {
+  let n = 0;
+  for (let i = 0; i < pos; i++) if (ta.value[i] === '\n') n++;
+  return n;
+}
+function posToLC(pos) {
+  const before = ta.value.slice(0, pos);
+  const line = (before.match(/\n/g) || []).length;
+  const col = pos - (before.lastIndexOf('\n') + 1);
+  return { line, col };
+}
+function lcToPos(line, col) {
+  const ls = lines();
+  let p = 0;
+  for (let i = 0; i < line && i < ls.length; i++) p += ls[i].length + 1;
+  return p + Math.min(col, (ls[line] || '').length);
+}
+
+/* ---------------- edits that keep native undo ---------------- */
+function insert(str, selStart, selEnd) {
+  if (selStart !== undefined) ta.setSelectionRange(selStart, selEnd ?? selStart);
+  ta.focus();
+  let ok = false;
+  try { ok = document.execCommand('insertText', false, str); } catch (e) { ok = false; }
+  if (!ok) {
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    ta.value = ta.value.slice(0, s) + str + ta.value.slice(e);
+    ta.setSelectionRange(s + str.length, s + str.length);
+  }
+  onEdit();
+}
+
+function onEdit() {
+  markDirty();
+  render();
+  scheduleGhost();
+  updateOutline();
+  updatePinUse();
+  updateCursorCell();
+}
+
+/* ---------------- symbols found in the open document ---------------- */
+let docSymbols = [], docObjects = {}, bigrams = new Map();
+
+function scanDocument() {
+  const src = ta.value;
+  docSymbols = []; docObjects = {};
+  const seen = new Set();
+  const add = (label, kind, sig, doc) => {
+    if (seen.has(label + kind) || KWSET.has(label)) return;
+    seen.add(label + kind);
+    docSymbols.push({ label, kind, sig: sig || '', doc: doc || '', local: true });
+  };
+  // functions
+  const fnRe = /^[ \t]*(?:static\s+|inline\s+|IRAM_ATTR\s+)*([A-Za-z_][\w:*&<>, ]*?)\s+([A-Za-z_]\w*)\s*\(([^;{)]*)\)\s*\{/gm;
+  let m;
+  while ((m = fnRe.exec(src))) {
+    if (['if', 'for', 'while', 'switch', 'else', 'return'].includes(m[2])) continue;
+    add(m[2], 'fn', m[2] + '(' + m[3].trim() + ')', 'Defined in this sketch.');
+  }
+  // defines
+  const defRe = /^[ \t]*#define\s+([A-Za-z_]\w*)(?:\(([^)]*)\))?\s*(.*)$/gm;
+  while ((m = defRe.exec(src)))
+    add(m[1], 'cn', m[2] ? m[1] + '(' + m[2] + ')' : '', 'Macro: ' + (m[3] || '').trim().slice(0, 70));
+  // variables and objects
+  const varRe = /^[ \t]*(?:const\s+|static\s+|volatile\s+|extern\s+|unsigned\s+)*([A-Za-z_]\w*(?:\s*[*&])?)\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*(?:=|;|\()/gm;
+  while ((m = varRe.exec(src))) {
+    const type = m[1].replace(/[*&\s]/g, ''), name = m[2];
+    if (KWSET.has(name) || ['return', 'else', 'case'].includes(type)) continue;
+    add(name, 'var', type + ' ' + name, 'Declared in this sketch.');
+    if (TYPEMAP[type]) docObjects[name] = TYPEMAP[type];
+  }
+  // learn what token tends to follow what, inside this file
+  bigrams = new Map();
+  const toks = src.match(/[A-Za-z_]\w*|[(){};.,]|->|::/g) || [];
+  for (let i = 0; i < toks.length - 1; i++) {
+    const k = toks[i];
+    if (!bigrams.has(k)) bigrams.set(k, new Map());
+    const inner = bigrams.get(k);
+    inner.set(toks[i + 1], (inner.get(toks[i + 1]) || 0) + 1);
+  }
+}
+
+/* ---------------- completion ---------------- */
+const ARGVALUES = {
+  pinMode: [null, ['OUTPUT', 'INPUT', 'INPUT_PULLUP', 'INPUT_PULLDOWN']],
+  digitalWrite: [null, ['HIGH', 'LOW']],
+  attachInterrupt: [null, null, ['FALLING', 'RISING', 'CHANGE']],
+  analogSetAttenuation: [['ADC_11db', 'ADC_6db', 'ADC_2_5db', 'ADC_0db']],
+  analogSetPinAttenuation: [null, ['ADC_11db', 'ADC_6db', 'ADC_2_5db', 'ADC_0db']],
+  mode: [['WIFI_STA', 'WIFI_AP', 'WIFI_AP_STA', 'WIFI_OFF']],
+  begin: [['115200', '9600', '921600']],
+};
+
+function contextAt(pos) {
+  const src = ta.value;
+  const ls = src.lastIndexOf('\n', pos - 1) + 1;
+  const line = src.slice(ls, pos);
+  const full = src.slice(ls, (src.indexOf('\n', pos) + 1 || src.length + 1) - 1);
+
+  // inside a comment or string, stay out of the way
+  const noStr = line.replace(/\\./g, '');
+  const dq = (noStr.match(/"/g) || []).length, sq = (noStr.match(/'/g) || []).length;
+  if (line.includes('//') || dq % 2 === 1 || sq % 2 === 1)
+    return { type: 'none', word: '' };
+
+  let m = /#\s*include\s*[<"]([A-Za-z0-9_./]*)$/.exec(line);
+  if (m) return { type: 'header', word: m[1], start: pos - m[1].length };
+
+  m = /([A-Za-z_]\w*)\s*(->|\.|::)\s*([A-Za-z_]\w*)?$/.exec(line);
+  if (m) {
+    const w = m[3] || '';
+    return { type: 'member', recv: m[1], word: w, start: pos - w.length, line, full };
+  }
+  m = /([A-Za-z_]\w*)$/.exec(line);
+  const w = m ? m[1] : '';
+  return { type: 'word', word: w, start: pos - w.length, line, full };
+}
+
+function callContext(pos) {
+  const src = ta.value;
+  let depth = 0, i = pos - 1, commas = 0;
+  const stop = Math.max(0, pos - 900);
+  while (i >= stop) {
+    const c = src[i];
+    if (c === ')') depth++;
+    else if (c === '(') {
+      if (depth === 0) {
+        const before = src.slice(Math.max(0, i - 90), i);
+        const m = /([A-Za-z_]\w*)\s*$/.exec(before);
+        if (!m) return null;
+        const rm = /([A-Za-z_]\w*)\s*(?:\.|->|::)\s*$/.exec(before.slice(0, before.length - m[1].length));
+        return { name: m[1], recv: rm ? rm[1] : null, arg: commas, open: i };
+      }
+      depth--;
+    } else if (c === ',' && depth === 0) commas++;
+    else if (c === ';' || c === '\n' && depth === 0 && src[i - 1] === ';') return null;
+    i--;
+  }
+  return null;
+}
+
+function typeOf(name) {
+  return docObjects[name] || OBJECTS[name] || TYPEMAP[name] || null;
+}
+
+function candidatesFor(ctx) {
+  if (ctx.type === 'none') return [];
+  if (ctx.type === 'header') return HEADERS;
+  if (ctx.type === 'member') {
+    const t = typeOf(ctx.recv);
+    let list = t && MEMBERS[t] ? MEMBERS[t] : [];
+    if (!list.length) {
+      // unknown receiver, offer every member we know so it is still useful
+      const all = [], seen = new Set();
+      for (const k in MEMBERS) for (const it of MEMBERS[k])
+        if (!seen.has(it.label)) { seen.add(it.label); all.push(it); }
+      list = all;
+    }
+    if (ctx.recv === 'BLEDevice' || ctx.recv === 'BLECharacteristic')
+      list = list.concat(P('fn', [
+        'init|init(std::string name)|Start the BLE stack with a device name.|void',
+        'createServer|createServer()|Make a GATT server.|BLEServer*',
+        'getScan|getScan()|Get the scanner object.|BLEScan*',
+        'startAdvertising|startAdvertising()|Begin advertising.|void',
+      ]));
+    return list;
+  }
+  const call = callContext(ta.selectionStart);
+  let extra = [];
+  if (call && ARGVALUES[call.name] && ARGVALUES[call.name][call.arg]) {
+    extra = ARGVALUES[call.name][call.arg].map(v => ({
+      label: v, kind: /^[0-9]/.test(v) ? 'cn' : 'cn', sig: '',
+      doc: 'Common value for this argument.', ret: '', boost: 60,
+    }));
+  }
+  const snips = SNIPPETS.map(s => ({
+    label: s.label, kind: 'snip', sig: s.title, doc: s.note,
+    snippet: s.body, ret: '',
+  }));
+  return [...extra, ...docSymbols, ...CORE, ...CONSTANTS, ...snips,
+          ...Object.keys(OBJECTS).map(o => ({
+            label: o, kind: 'ty', sig: OBJECTS[o],
+            doc: 'Built in object. Type a dot to see what it can do.', ret: '',
+          })),
+          ...TYPEWORDS.map(t => ({ label: t, kind: 'ty', sig: '', doc: '', ret: '' })),
+          ...KEYWORDS.map(k => ({ label: k, kind: 'kw', sig: '', doc: '', ret: '' }))];
+}
+
+function score(needle, hay) {
+  if (!needle) return 1;
+  const n = needle.toLowerCase(), h = hay.toLowerCase();
+  if (h === n) return 1000;
+  if (h.startsWith(n)) return 700 - h.length + needle.length * 8;
+  const idx = h.indexOf(n);
+  if (idx > 0) return 380 - idx * 3 - h.length;
+  // camel hump initials, ledcW matches ledcWrite
+  let hi = 0, score = 0;
+  for (let i = 0; i < n.length; i++) {
+    const at = h.indexOf(n[i], hi);
+    if (at === -1) return 0;
+    score += at === hi ? 6 : 1;
+    hi = at + 1;
+  }
+  return 90 + score - h.length * 0.4;
+}
+
+function highlightMatch(label, needle) {
+  if (!needle) return esc(label);
+  const l = label.toLowerCase(), n = needle.toLowerCase();
+  let out = '', hi = 0;
+  for (const ch of n) {
+    const at = l.indexOf(ch, hi);
+    if (at === -1) return esc(label);
+    out += esc(label.slice(hi, at)) + '<em>' + esc(label[at]) + '</em>';
+    hi = at + 1;
+  }
+  return out + esc(label.slice(hi));
+}
+
+let acItems = [], acSel = 0, acCtx = null;
+
+function openAC(manual) {
+  const pos = ta.selectionStart;
+  if (ta.selectionEnd !== pos) return closeAC();
+  const ctx = contextAt(pos);
+  if (ctx.type === 'none') return closeAC();
+  if (!manual && ctx.type === 'word' && ctx.word.length < 2 &&
+      !(callContext(pos) && ARGVALUES[callContext(pos).name])) return closeAC();
+  const pool = candidatesFor(ctx);
+  const scored = [];
+  for (const it of pool) {
+    const s = score(ctx.word, it.label) + (it.boost || 0) +
+      (it.local ? 40 : 0) + (it.kind === 'snip' ? 12 : 0);
+    if (s > 0) scored.push([s, it]);
+  }
+  scored.sort((a, b) => b[0] - a[0] || a[1].label.length - b[1].label.length);
+  acItems = scored.slice(0, 60).map(x => x[1]);
+  if (!acItems.length) return closeAC();
+  acCtx = ctx; acSel = 0;
+  paintAC();
+  placeAC();
+  acBox.style.display = 'block';
+}
+
+function paintAC() {
+  acList.innerHTML = acItems.map((it, i) => {
+    const kc = { fn: 'k-fn', ty: 'k-ty', cn: 'k-cn', var: 'k-var',
+                 snip: 'k-snip', hdr: 'k-hdr', kw: 'k-cn' }[it.kind] || 'k-fn';
+    const kn = { fn: 'func', ty: 'type', cn: 'const', var: 'var',
+                 snip: 'snip', hdr: 'header', kw: 'key' }[it.kind] || it.kind;
+    const sig = it.sig && it.sig !== it.label
+      ? it.sig.replace(/^[A-Za-z_]\w*/, '') : '';
+    return '<div class="ai' + (i === acSel ? ' sel' : '') + '" data-i="' + i + '">' +
+      '<span class="kind ' + kc + '">' + kn + '</span>' +
+      '<span class="lbl">' + highlightMatch(it.label, acCtx.word) + '</span>' +
+      '<span class="sig">' + esc(sig) + '</span></div>';
+  }).join('');
+  const it = acItems[acSel];
+  acDoc.innerHTML = it
+    ? (it.sig ? '<code>' + esc(it.sig) + '</code>' +
+        (it.ret ? ' <span class="ret">&rarr; ' + esc(it.ret) + '</span>' : '') + '<br>' : '') +
+      esc(it.doc || '')
+    : '';
+  const el = acList.querySelector('.ai.sel');
+  if (el) el.scrollIntoView({ block: 'nearest' });
+}
+
+function placeAC() {
+  const p = posToLC(acCtx.start ?? ta.selectionStart);
+  const wrapRect = $('#edwrap').getBoundingClientRect();
+  const scRect = scroll.getBoundingClientRect();
+  let x = scRect.left - wrapRect.left + padL + p.col * charW - scroll.scrollLeft;
+  let y = scRect.top - wrapRect.top + padT + (p.line + 1) * lineH - scroll.scrollTop;
+  const bw = acBox.offsetWidth || 430, bh = acBox.offsetHeight || 260;
+  if (x + bw > wrapRect.width - 8) x = Math.max(4, wrapRect.width - bw - 8);
+  if (y + bh > wrapRect.height - 4) y = Math.max(4, y - lineH - bh);
+  acBox.style.left = x + 'px';
+  acBox.style.top = y + 'px';
+}
+
+function closeAC() { acBox.style.display = 'none'; acItems = []; }
+const acOpen = () => acBox.style.display === 'block';
+
+function acceptAC() {
+  const it = acItems[acSel];
+  if (!it) return;
+  const start = acCtx.start ?? ta.selectionStart;
+  const end = ta.selectionStart;
+  closeAC();
+  if (it.kind === 'snip' && it.snippet) {
+    insertSnippet(it.snippet, start, end);
+    return;
+  }
+  let str = it.label, caretBack = 0;
+  if (acCtx.type === 'header') {
+    const after = ta.value.slice(end, end + 1);
+    str = it.label + (after === '>' || after === '"' ? '' :
+      (/^#\s*include\s*"/.test(acCtx.line) ? '"' : '>'));
+  } else if (it.kind === 'fn' && it.sig) {
+    const args = /\(([^)]*)\)/.exec(it.sig);
+    const empty = !args || !args[1].trim();
+    if (ta.value[end] !== '(') { str = it.label + '()'; caretBack = empty ? 0 : 1; }
+  }
+  insert(str, start, end);
+  if (caretBack) {
+    const p = ta.selectionStart - caretBack;
+    ta.setSelectionRange(p, p);
+    setTimeout(() => showSig(), 0);
+  }
+}
+
+/* ---------------- snippets with tab stops ---------------- */
+function insertSnippet(body, start, end) {
+  const baseCol = (() => {
+    const ls = ta.value.lastIndexOf('\n', (start ?? ta.selectionStart) - 1) + 1;
+    const pre = ta.value.slice(ls, start ?? ta.selectionStart);
+    return /^\s*$/.test(pre) ? pre : '';
+  })();
+  let raw = body.replace(/\n/g, '\n' + baseCol);
+  const stops = [];
+  let outText = '', i = 0, cursor = -1;
+  const named = {};
+  while (i < raw.length) {
+    const m = /^\$\{(\d+):([^}]*)\}|^\$(\d+)/.exec(raw.slice(i));
+    if (m) {
+      if (m[1] !== undefined) {
+        const idx = +m[1], def = m[2];
+        if (named[idx] !== undefined) {
+          stops.push({ idx, from: outText.length, to: outText.length + named[idx].length });
+          outText += named[idx];
+        } else {
+          named[idx] = def;
+          stops.push({ idx, from: outText.length, to: outText.length + def.length });
+          outText += def;
+        }
+      } else if (+m[3] === 0) {
+        cursor = outText.length;
+      } else {
+        stops.push({ idx: +m[3], from: outText.length, to: outText.length });
+      }
+      i += m[0].length;
+      continue;
+    }
+    outText += raw[i++];
+  }
+  const at = start ?? ta.selectionStart;
+  insert(outText, at, end ?? ta.selectionStart);
+  stops.sort((a, b) => a.idx - b.idx || a.from - b.from);
+  St.snipStops = stops.map(s => ({ from: at + s.from, to: at + s.to }));
+  St.snipEnd = at + outText.length;
+  if (St.snipStops.length) {
+    const s = St.snipStops.shift();
+    ta.setSelectionRange(s.from, s.to);
+  } else if (cursor >= 0) {
+    ta.setSelectionRange(at + cursor, at + cursor);
+  }
+  scrollCaretIntoView();
+  render();
+}
+
+function nextSnipStop() {
+  if (!St.snipStops.length) return false;
+  const p = ta.selectionStart;
+  if (p < 0 || p > St.snipEnd + 40) { St.snipStops = []; return false; }
+  const s = St.snipStops.shift();
+  ta.setSelectionRange(s.from, s.to);
+  scrollCaretIntoView();
+  return true;
+}
+
+/* ---------------- signature help ---------------- */
+function lookupSig(name, recv) {
+  if (recv) {
+    const t = typeOf(recv);
+    if (t && MEMBERS[t]) {
+      const f = MEMBERS[t].find(x => x.label === name);
+      if (f) return f;
+    }
+    for (const k in MEMBERS) {
+      const f = MEMBERS[k].find(x => x.label === name);
+      if (f) return f;
+    }
+  }
+  return CORE.find(x => x.label === name) ||
+         docSymbols.find(x => x.label === name && x.kind === 'fn') || null;
+}
+
+function showSig() {
+  const call = callContext(ta.selectionStart);
+  if (!call) return hideSig();
+  const f = lookupSig(call.name, call.recv);
+  if (!f || !f.sig) return hideSig();
+  const am = /\(([^)]*)\)/.exec(f.sig);
+  const args = am && am[1].trim() ? am[1].split(',').map(s => s.trim()) : [];
+  const shown = args.map((a, i) => i === call.arg
+    ? '<span class="cur">' + esc(a) + '</span>' : esc(a)).join(', ');
+  sigBox.innerHTML = '<b>' + esc(f.label) + '</b>(' + shown + ')' +
+    (f.ret ? ' <span style="color:var(--wire)">&rarr; ' + esc(f.ret) + '</span>' : '');
+  const p = posToLC(call.open);
+  const wrapRect = $('#edwrap').getBoundingClientRect();
+  const scRect = scroll.getBoundingClientRect();
+  let x = scRect.left - wrapRect.left + padL + p.col * charW - scroll.scrollLeft;
+  let y = scRect.top - wrapRect.top + padT + p.line * lineH - scroll.scrollTop - lineH - 6;
+  if (y < 2) y = scRect.top - wrapRect.top + padT + (p.line + 1) * lineH -
+    scroll.scrollTop + 4;
+  sigBox.style.display = 'block';
+  x = Math.min(x, wrapRect.width - sigBox.offsetWidth - 10);
+  sigBox.style.left = Math.max(4, x) + 'px';
+  sigBox.style.top = y + 'px';
+}
+function hideSig() { sigBox.style.display = 'none'; }
+
+/* ---------------- inline prediction, the grey text ---------------- */
+let ghostTimer = null;
+
+function scheduleGhost() {
+  clearTimeout(ghostTimer);
+  clearGhost();
+  if (!St.ghostOn) return;
+  ghostTimer = setTimeout(computeGhost, 90);
+}
+
+function clearGhost() { ghost.innerHTML = ''; St.ghostText = ''; St.ghostAt = -1; }
+
+const PATTERNS = [
+  [/void\s+setup\s*\(\s*\)\s*\{\s*$/, 'Serial.begin(115200);'],
+  [/Serial\.begin\([^)]*\);\s*$/, 'while (!Serial) delay(10);'],
+  [/^\s*if\s*\(\s*WiFi\.st$/, 'atus() != WL_CONNECTED) {'],
+  [/^\s*while\s*\(\s*WiFi\.status\(\)\s*!=\s*WL_CONNECTED\s*\)\s*\{\s*$/, 'delay(250);'],
+  [/^\s*for\s*\($/, 'int i = 0; i < 10; i++) {'],
+  [/^\s*#include\s*<W$/, 'iFi.h>'],
+  [/^\s*#include\s*<A$/, 'rduino.h>'],
+  [/pinMode\($/, 'LED, OUTPUT);'],
+  [/digitalWrite\($/, 'LED, HIGH);'],
+  [/^\s*Serial\.print$/, 'ln();'],
+  [/^\s*millis\(\)\s*-\s*$/, 'lastRun >= INTERVAL) {'],
+  [/xTaskCreatePinnedToCore\($/, 'taskFn, "task", 4096, nullptr, 1, nullptr, 0);'],
+  [/ledcAttach\($/, 'pin, 5000, 12);'],
+  [/esp_sleep_enable_timer_wakeup\($/, '10 * 1000000ULL);'],
+  [/analogSetPinAttenuation\($/, 'pin, ADC_11db);'],
+  [/attachInterrupt\($/, 'pin, onPress, FALLING);'],
+  [/Wire\.begin\($/, '21, 22);'],
+];
+
+function computeGhost() {
+  const pos = ta.selectionStart;
+  if (pos !== ta.selectionEnd || acOpen()) return;
+  const src = ta.value;
+  const lineStart = src.lastIndexOf('\n', pos - 1) + 1;
+  const lineEnd = src.indexOf('\n', pos);
+  const rest = src.slice(pos, lineEnd === -1 ? src.length : lineEnd);
+  if (rest.trim()) return;                        // only predict at end of a line
+  const before = src.slice(lineStart, pos);
+  if (!before.trim() && before.length < 2) return;
+  const ctx = contextAt(pos);
+  if (ctx.type === 'none') return;
+
+  let g = '';
+
+  // 1. a line in this file that starts the same way, the strongest signal
+  const trimmed = before.replace(/^\s+/, '');
+  if (trimmed.length >= 4) {
+    const all = src.split('\n');
+    const myLine = (src.slice(0, lineStart).match(/\n/g) || []).length;
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (i === myLine) continue;
+      const t = all[i].replace(/^\s+/, '');
+      if (t.length > trimmed.length && t.startsWith(trimmed)) {
+        g = t.slice(trimmed.length);
+        break;
+      }
+    }
+  }
+  // 2. hand written patterns for the usual ESP32 shapes
+  if (!g) for (const [re, out] of PATTERNS) {
+    if (re.test(before)) {
+      g = (/\{\s*$/.test(before) ? '\n  ' : '') + out;
+      if (g.startsWith('\n')) g = '';            // keep the ghost on one line
+      else break;
+    }
+  }
+  // 3. one obvious identifier completion
+  if (!g && ctx.word.length >= 3) {
+    const pool = candidatesFor(ctx)
+      .filter(c => c.kind !== 'snip' && c.label.toLowerCase()
+        .startsWith(ctx.word.toLowerCase()) && c.label !== ctx.word);
+    const uniq = [...new Set(pool.map(c => c.label))];
+    if (uniq.length === 1) g = uniq[0].slice(ctx.word.length) +
+      (pool[0].kind === 'fn' ? '(' : '');
+    else if (uniq.length > 1) {
+      // longest shared start of the top matches still helps
+      let common = uniq[0];
+      for (const u of uniq) {
+        let k = 0;
+        while (k < common.length && k < u.length && common[k] === u[k]) k++;
+        common = common.slice(0, k);
+      }
+      if (common.length > ctx.word.length) g = common.slice(ctx.word.length);
+    }
+  }
+  // 4. what usually follows this token in this file
+  if (!g && /[;)}]\s*$/.test(before) === false) {
+    const toks = before.match(/[A-Za-z_]\w*|[(){};.,]|->|::/g);
+    const last = toks && toks[toks.length - 1];
+    if (last && /\W$/.test(before) && bigrams.has(last)) {
+      const inner = [...bigrams.get(last).entries()].sort((a, b) => b[1] - a[1]);
+      if (inner.length && inner[0][1] >= 2 && /^\w/.test(inner[0][0]))
+        g = inner[0][0];
+    }
+  }
+  if (!g || g.length < 2 || g.length > 120) return;
+  if (aiPending) return;
+  paintGhost(before, g, pos);
+}
+
+function paintGhost(before, g, pos) {
+  St.ghostText = g; St.ghostAt = pos;
+  const p = posToLC(pos);
+  ghost.innerHTML = '<div style="position:absolute;left:' +
+    (padL + p.col * charW) + 'px;top:' + (padT + p.line * lineH) +
+    'px;white-space:pre"><i>' + esc(g) + '</i></div>';
+}
+
+function acceptGhost(oneWord) {
+  if (!St.ghostText || St.ghostAt !== ta.selectionStart) return false;
+  let take = St.ghostText;
+  if (oneWord) {
+    const m = /^\W*\w+|^\W+/.exec(take);
+    take = m ? m[0] : take;
+  }
+  clearGhost();
+  insert(take);
+  return true;
+}
+
+/* optional model backed prediction */
+let aiPending = false, aiKey = '', aiCache = new Map();
+const AI_HOSTED = /claude\.(ai|com)$/.test(location.hostname);
+
+async function aiGhost() {
+  if (aiPending) return;
+  if (!aiKey && !AI_HOSTED) return toast('Add an API key in Setup to use model suggestions', 'bad');
+  const pos = ta.selectionStart;
+  const before = ta.value.slice(Math.max(0, pos - 1400), pos);
+  const after = ta.value.slice(pos, pos + 400);
+  const key = before.slice(-160);
+  if (aiCache.has(key)) return paintGhost('', aiCache.get(key), pos);
+  aiPending = true;
+  setLed('build', 'on');
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (aiKey) {
+      headers['x-api-key'] = aiKey;
+      headers['anthropic-version'] = '2023-06-01';
+      headers['anthropic-dangerous-direct-browser-access'] = 'true';
+    }
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6', max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: 'You are completing Arduino C++ code for an ESP32 (arduino-esp32 core 3.x). ' +
+            'Continue from the caret marked <CARET>. Reply with the continuation text only: ' +
+            'no explanation, no markdown fences, no repeat of the text before the caret. ' +
+            'Keep it to at most 6 lines and match the surrounding indentation.\n\n' +
+            '```cpp\n' + before + '<CARET>' + after + '\n```',
+        }],
+      }),
+    });
+    const data = await r.json();
+    let out = (data.content || []).filter(b => b.type === 'text')
+      .map(b => b.text).join('').replace(/```[a-z+]*\n?|```/g, '');
+    out = out.replace(/^\n+/, '');
+    if (out) {
+      aiCache.set(key, out);
+      if (ta.selectionStart === pos) paintGhostMulti(out, pos);
+    }
+  } catch (e) {
+    toast('Suggestion request failed: ' + e.message, 'bad');
+  } finally {
+    aiPending = false;
+    setLed('build', '');
+  }
+}
+
+function paintGhostMulti(g, pos) {
+  St.ghostText = g; St.ghostAt = pos;
+  const p = posToLC(pos);
+  const rows = g.split('\n');
+  ghost.innerHTML = rows.map((r, i) => '<div style="position:absolute;left:' +
+    (padL + (i === 0 ? p.col * charW : 0)) + 'px;top:' +
+    (padT + (p.line + i) * lineH) + 'px;white-space:pre"><i>' +
+    esc(r || ' ') + '</i></div>').join('');
+}
+
+/* ---------------- typing behaviour ---------------- */
+const PAIRS = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'" };
+const CLOSERS = new Set([')', ']', '}', '"', "'"]);
+
+function indentOf(line) { return (/^[ \t]*/.exec(line) || [''])[0]; }
+
+ta.addEventListener('keydown', e => {
+  const pos = ta.selectionStart, end = ta.selectionEnd;
+  const src = ta.value;
+  const lineStart = src.lastIndexOf('\n', pos - 1) + 1;
+  const line = src.slice(lineStart, pos);
+  const mod = e.ctrlKey || e.metaKey;
+
+  if (acOpen()) {
+    if (e.key === 'ArrowDown') { acSel = (acSel + 1) % acItems.length; paintAC(); return e.preventDefault(); }
+    if (e.key === 'ArrowUp') { acSel = (acSel - 1 + acItems.length) % acItems.length; paintAC(); return e.preventDefault(); }
+    if (e.key === 'Enter' || e.key === 'Tab') { acceptAC(); return e.preventDefault(); }
+    if (e.key === 'Escape') { closeAC(); return e.preventDefault(); }
+    if (e.key === 'PageDown') { acSel = Math.min(acItems.length - 1, acSel + 8); paintAC(); return e.preventDefault(); }
+    if (e.key === 'PageUp') { acSel = Math.max(0, acSel - 8); paintAC(); return e.preventDefault(); }
+  }
+
+  if (mod && e.key === ' ') { e.preventDefault(); return openAC(true); }
+  if (mod && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); return aiGhost(); }
+  if (e.key === 'Escape') { closeAC(); clearGhost(); hideSig(); return; }
+
+  if (e.key === 'Tab' && !e.shiftKey) {
+    if (St.ghostText && acceptGhost(false)) return e.preventDefault();
+    if (nextSnipStop()) return e.preventDefault();
+    e.preventDefault();
+    if (pos !== end) return indentBlock(1);
+    return insert('  ');
+  }
+  if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); return indentBlock(-1); }
+  if (e.key === 'ArrowRight' && St.ghostText && pos === end &&
+      St.ghostAt === pos) { if (acceptGhost(true)) return e.preventDefault(); }
+
+  if (e.key === 'Enter' && !mod) {
+    e.preventDefault();
+    const ind = indentOf(src.slice(lineStart, src.indexOf('\n', pos) === -1
+      ? src.length : src.indexOf('\n', pos)));
+    const opens = /[{([]\s*$/.test(line);
+    const nextCh = src.slice(end, end + 1);
+    if (opens && CLOSERS.has(nextCh)) {
+      insert('\n' + ind + '  ' + '\n' + ind, pos, end);
+      const p = pos + 1 + ind.length + 2;
+      ta.setSelectionRange(p, p);
+      render();
+      return scrollCaretIntoView();
+    }
+    return insert('\n' + ind + (opens ? '  ' : ''), pos, end);
+  }
+
+  if (PAIRS[e.key] && !e.ctrlKey && !e.metaKey) {
+    const sel = src.slice(pos, end);
+    if (sel) { e.preventDefault(); return insert(e.key + sel + PAIRS[e.key], pos, end); }
+    const after = src.slice(pos, pos + 1);
+    if ((e.key === '"' || e.key === "'") && after === e.key) {
+      e.preventDefault();
+      ta.setSelectionRange(pos + 1, pos + 1);
+      return;
+    }
+    if (/[\w"']/.test(after) && e.key !== '(' ) return;
+    e.preventDefault();
+    insert(e.key + PAIRS[e.key], pos, end);
+    ta.setSelectionRange(pos + 1, pos + 1);
+    if (e.key === '(') setTimeout(showSig, 0);
+    return;
+  }
+  if (CLOSERS.has(e.key) && src.slice(pos, pos + 1) === e.key && pos === end) {
+    e.preventDefault();
+    ta.setSelectionRange(pos + 1, pos + 1);
+    if (e.key === ')') hideSig();
+    return;
+  }
+  if (e.key === '}' && /^\s*$/.test(line) && line.length >= 2) {
+    e.preventDefault();
+    return insert('}', lineStart + Math.max(0, line.length - 2), end);
+  }
+  if (e.key === 'Backspace' && pos === end && pos > 0) {
+    const a = src[pos - 1], b = src[pos];
+    if (PAIRS[a] === b) { e.preventDefault(); return insert('', pos - 1, pos + 1); }
+  }
+});
+
+function indentBlock(dir) {
+  const src = ta.value;
+  let a = src.lastIndexOf('\n', ta.selectionStart - 1) + 1;
+  let b = src.indexOf('\n', ta.selectionEnd);
+  if (b === -1) b = src.length;
+  const block = src.slice(a, b).split('\n').map(l =>
+    dir > 0 ? '  ' + l : l.replace(/^ {1,2}/, '')).join('\n');
+  insert(block, a, b);
+  ta.setSelectionRange(a, a + block.length);
+  render();
+}
+
+ta.addEventListener('input', () => {
+  scanDocument();
+  onEdit();
+  if (St.acAuto) openAC(false); else closeAC();
+  showSig();
+});
+
+ta.addEventListener('keyup', e => {
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+    drawCurline(); render(); updateCursorCell(); showSig();
+    if (acOpen()) closeAC();
+  }
+});
+ta.addEventListener('click', () => { drawCurline(); render(); updateCursorCell(); closeAC(); showSig(); });
+ta.addEventListener('blur', () => { closeAC(); hideSig(); });
+scroll.addEventListener('scroll', () => {
+  syncGutter();
+  if (acOpen()) placeAC();
+  if (sigBox.style.display === 'block') showSig();
+});
+acList.addEventListener('mousedown', e => {
+  const el = e.target.closest('.ai');
+  if (!el) return;
+  e.preventDefault();
+  acSel = +el.dataset.i;
+  acceptAC();
+});
+
+function scrollCaretIntoView() {
+  const p = posToLC(ta.selectionStart);
+  const top = padT + p.line * lineH, left = padL + p.col * charW;
+  if (top < scroll.scrollTop + lineH)
+    scroll.scrollTop = Math.max(0, top - lineH * 3);
+  if (top + lineH > scroll.scrollTop + scroll.clientHeight - lineH)
+    scroll.scrollTop = top - scroll.clientHeight + lineH * 4;
+  if (left < scroll.scrollLeft + 40) scroll.scrollLeft = Math.max(0, left - 120);
+  if (left > scroll.scrollLeft + scroll.clientWidth - 60)
+    scroll.scrollLeft = left - scroll.clientWidth + 160;
+}
+
+function updateCursorCell() {
+  const p = posToLC(ta.selectionStart);
+  $('#st-cursor').textContent = 'Ln ' + (p.line + 1) + ', Col ' + (p.col + 1);
+}
+
+/* ---------------- outline ---------------- */
+function updateOutline() {
+  const src = ta.value, items = [];
+  const re = /^[ \t]*(?:static\s+|inline\s+|IRAM_ATTR\s+)*(?:[A-Za-z_][\w:*&<>, ]*?)\s+([A-Za-z_]\w*)\s*\([^;{)]*\)\s*\{/gm;
+  let m;
+  while ((m = re.exec(src))) {
+    if (['if', 'for', 'while', 'switch', 'else'].includes(m[1])) continue;
+    items.push({ name: m[1], line: (src.slice(0, m.index).match(/\n/g) || []).length + 1 });
+  }
+  const el = $('#outline');
+  el.innerHTML = items.length
+    ? items.map(i => '<div class="row" data-line="' + i.line + '">' +
+        '<span class="dot"></span><span class="name">' + esc(i.name) +
+        '</span><span style="color:var(--dim);font-size:10px">' + i.line +
+        '</span></div>').join('')
+    : '<div class="hint">Functions you define show up here.</div>';
+  el.querySelectorAll('.row').forEach(r => r.onclick = () => gotoLine(+r.dataset.line));
+}
+
+function gotoLine(n) {
+  const p = lcToPos(Math.max(0, n - 1), 0);
+  ta.focus();
+  ta.setSelectionRange(p, p);
+  scrollCaretIntoView();
+  render();
+  updateCursorCell();
+}
+
+/* ---------------- find ---------------- */
+const findBox = $('#find'), findQ = $('#findq');
+function runFind() {
+  const q = findQ.value;
+  St.findMatches = []; St.findLen = q.length;
+  if (q) {
+    const src = ta.value.toLowerCase(), n = q.toLowerCase();
+    let i = src.indexOf(n);
+    while (i !== -1 && St.findMatches.length < 400) {
+      St.findMatches.push(i);
+      i = src.indexOf(n, i + Math.max(1, n.length));
+    }
+  }
+  $('#findn').textContent = St.findMatches.length
+    ? (St.findIdx + 1) + '/' + St.findMatches.length : '0/0';
+  render();
+}
+function jumpFind(d) {
+  if (!St.findMatches.length) return;
+  St.findIdx = (St.findIdx + d + St.findMatches.length) % St.findMatches.length;
+  const p = St.findMatches[St.findIdx];
+  ta.focus();
+  ta.setSelectionRange(p, p + St.findLen);
+  scrollCaretIntoView();
+  runFind();
+}
+findQ.addEventListener('input', () => { St.findIdx = 0; runFind(); });
+findQ.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); jumpFind(e.shiftKey ? -1 : 1); }
+  if (e.key === 'Escape') closeFind();
+});
+$('#findnext').onclick = () => jumpFind(1);
+$('#findprev').onclick = () => jumpFind(-1);
+$('#findx').onclick = closeFind;
+function openFind() {
+  findBox.classList.add('on');
+  const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+  if (sel && sel.length < 60) findQ.value = sel;
+  findQ.focus(); findQ.select(); runFind();
+}
+function closeFind() {
+  findBox.classList.remove('on');
+  St.findMatches = []; render(); ta.focus();
+}
+</script>
+<script>
+/* ====================================================================
+   Application layer
+   ==================================================================== */
+let ONLINE = false, HEALTH = {}, SET = {}, curJob = null, serialES = null;
+
+async function api(path, body) {
+  const opt = body !== undefined
+    ? { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body) }
+    : {};
+  const r = await fetch(path, opt);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ('request failed with ' + r.status));
+  return data;
+}
+
+/* ---------------- little helpers ---------------- */
+let toastT = null;
+function toast(msg, kind) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'on' + (kind ? ' ' + kind : '');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.className = '', 3200);
+}
+function setStatus(msg) { $('#st-msg').textContent = msg; }
+function setLed(name, cls) {
+  const el = $('#led-' + name);
+  if (el) el.className = 'led' + (cls ? ' ' + cls : '');
+}
+function blip(name) {
+  setLed(name, 'on');
+  clearTimeout(blip['t' + name]);
+  blip['t' + name] = setTimeout(() => setLed(name, ''), 110);
+}
+function modal(title, html, footer) {
+  $('#mtitle').textContent = title;
+  $('#mbody').innerHTML = html;
+  $('#mfoot').innerHTML = footer || '<button class="btn" data-close>Close</button>';
+  $('#modal').classList.add('on');
+  $('#mfoot').querySelectorAll('[data-close]').forEach(b => b.onclick = closeModal);
+}
+function closeModal() { $('#modal').classList.remove('on'); }
+$('#mclose').onclick = closeModal;
+$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+
+function logOut(text, cls) {
+  const el = $('#outlog');
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = text;
+  el.appendChild(d);
+  while (el.childElementCount > 2500) el.removeChild(el.firstChild);
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function showConsole(which) {
+  $$('#ctabs button[data-c]').forEach(b =>
+    b.classList.toggle('sel', b.dataset.c === which));
+  $$('.cpane').forEach(p => p.classList.toggle('sel', p.dataset.c === which));
+}
+$$('#ctabs button[data-c]').forEach(b => b.onclick = () => showConsole(b.dataset.c));
+$('#btn-clearlog').onclick = () => {
+  const on = $('#ctabs button.sel').dataset.c;
+  if (on === 'ser') $('#serlog').innerHTML = '';
+  else if (on === 'prob') { St.diags = []; paintProblems(); render(); }
+  else $('#outlog').innerHTML = '';
+};
+$$('#insptabs button').forEach(b => b.onclick = () => {
+  $$('#insptabs button').forEach(x => x.classList.toggle('sel', x === b));
+  $$('.ipane').forEach(p => p.classList.toggle('sel', p.dataset.i === b.dataset.i));
+  if (b.dataset.i === 'libs') loadInstalled();
+  if (b.dataset.i === 'board') loadBoardOptions();
+});
+$$('.sect>header').forEach(h => h.onclick = e => {
+  if (e.target.closest('.add')) return;
+  h.parentElement.classList.toggle('closed');
+});
+
+/* ---------------- health and setup ---------------- */
+async function checkHealth() {
+  try {
+    HEALTH = await api('/api/health');
+    ONLINE = true;
+    setLed('link', HEALTH.ready ? 'ok' : 'on');
+  } catch (e) {
+    ONLINE = false;
+    HEALTH = {};
+    setLed('link', 'bad');
+  }
+  paintBanner();
+}
+
+function paintBanner() {
+  const b = $('#banner'), t = $('#bantext'), act = $('#ban-act');
+  if (!ONLINE) {
+    t.textContent = 'Running without the local helper, so the editor works but ' +
+      'building and flashing do not. Start it with: python3 server.py';
+    act.textContent = 'How';
+    act.onclick = showOfflineHelp;
+    b.classList.add('on');
+    return;
+  }
+  if (!HEALTH.cli) {
+    t.textContent = 'arduino-cli is not installed yet. It does the compiling and flashing.';
+    act.textContent = 'Install it';
+    act.onclick = openSetup;
+    b.classList.add('on');
+    return;
+  }
+  if (!HEALTH.esp32Core) {
+    t.textContent = 'The ESP32 board support package is missing, so nothing can compile yet.';
+    act.textContent = 'Install it';
+    act.onclick = openSetup;
+    b.classList.add('on');
+    return;
+  }
+  if (!HEALTH.pyserial) {
+    t.textContent = 'The serial monitor needs pyserial. Everything else works.';
+    act.textContent = 'How';
+    act.onclick = () => modal('Serial monitor', '<p>Install pyserial, then restart ' +
+      'the helper:</p><p><code>pip install pyserial</code></p>');
+    b.classList.add('on');
+    return;
+  }
+  b.classList.remove('on');
+}
+$('#ban-hide').onclick = () => $('#banner').classList.remove('on');
+
+function showOfflineHelp() {
+  modal('Start the local helper', `
+    <p>The editor, suggestions and pin map all run in the browser. Compiling
+    and flashing need the small Python helper, because that is what talks to
+    the USB port and the compiler.</p>
+    <p>Put <code>server.py</code> and <code>index.html</code> in the same
+    folder, then run:</p>
+    <p><code>pip install pyserial</code><br><code>python3 server.py</code></p>
+    <p>Open <code>http://127.0.0.1:8787</code> and this bar disappears.</p>`);
+}
+
+const SETUP_STEPS = [
+  { id: 'cli', title: 'Install arduino-cli',
+    note: 'The compiler driver, about 30 MB, goes in your home folder.' },
+  { id: 'index', title: 'Add the Espressif board index',
+    note: 'Points arduino-cli at the official ESP32 package list.' },
+  { id: 'core', title: 'Install ESP32 board support',
+    note: 'The toolchain and libraries. Around 1 GB, so it takes a while.' },
+];
+
+function openSetup() {
+  const state = id => {
+    if (id === 'cli') return HEALTH.cli ? 'ok' : 'idle';
+    if (id === 'index') return HEALTH.cli ? 'idle' : 'idle';
+    if (id === 'core') return HEALTH.esp32Core ? 'ok' : 'idle';
+    return 'idle';
+  };
+  const rows = SETUP_STEPS.map((s, i) => `
+    <div class="step" data-step="${s.id}">
+      <span class="num">${i + 1}</span>
+      <span class="txt"><b>${s.title}</b><small>${s.note}</small></span>
+      <span class="state ${state(s.id)}" data-state>${
+        state(s.id) === 'ok' ? 'done' : 'pending'}</span>
+    </div>`).join('');
+  modal('Setup', `
+    <p>Three steps, top to bottom. Progress shows in the Output tab.</p>
+    ${rows}
+    <div style="margin-top:14px;border-top:1px solid var(--trace);padding-top:12px">
+      <div class="silk" style="margin-bottom:6px">Model suggestions</div>
+      <p style="margin-bottom:8px">Optional. With a key, Ctrl+Shift+P asks a
+      model for a longer continuation. The key stays in this tab and is never
+      written to disk.</p>
+      <input id="aikey" type="password" placeholder="sk-ant-..." style="width:100%;
+        background:var(--mask);border:1px solid var(--trace2);border-radius:3px;
+        padding:6px 8px;font-family:var(--mono);font-size:11.5px">
+    </div>
+    <p style="margin-top:12px;color:var(--dim)">Workspace: <code>${
+      HEALTH.home || 'unknown'}</code></p>`,
+    '<button class="btn" data-close>Close</button>' +
+    '<button class="btn go" id="setup-run">Run all steps</button>');
+  const ai = $('#aikey');
+  ai.value = aiKey;
+  ai.oninput = () => { aiKey = ai.value.trim(); };
+  $('#setup-run').onclick = runSetup;
+}
+
+async function runSetup() {
+  showConsole('out');
+  for (const s of SETUP_STEPS) {
+    const row = $('#modal [data-step="' + s.id + '"]');
+    const st = row && row.querySelector('[data-state]');
+    if (st && st.textContent === 'done') continue;
+    if (st) { st.className = 'state run'; st.textContent = 'running'; }
+    logOut('--- ' + s.title + ' ---', 'note');
+    try {
+      const { job } = await api('/api/setup', { step: s.id });
+      const res = await followJob(job);
+      if (st) {
+        st.className = 'state ' + (res.status === 'ok' ? 'ok' : 'bad');
+        st.textContent = res.status === 'ok' ? 'done' : 'failed';
+      }
+      if (res.status !== 'ok') {
+        toast(s.title + ' failed, see Output', 'bad');
+        break;
+      }
+    } catch (e) {
+      if (st) { st.className = 'state bad'; st.textContent = 'failed'; }
+      logOut(String(e.message), 'err');
+      break;
+    }
+  }
+  await checkHealth();
+  await loadBoards();
+  toast(HEALTH.ready ? 'Toolchain ready' : 'Setup did not finish, see Output',
+        HEALTH.ready ? 'good' : 'bad');
+}
+
+/* ---------------- jobs ---------------- */
+function followJob(id) {
+  return new Promise(resolve => {
+    const es = new EventSource('/api/job/stream?id=' + id);
+    curJob = id;
+    es.onmessage = ev => {
+      const r = JSON.parse(ev.data);
+      if (r.c === 'end') {
+        es.close();
+        curJob = null;
+        api('/api/job?id=' + id).then(resolve).catch(() => resolve({ status: 'failed' }));
+        return;
+      }
+      logOut(r.s, r.c === 'cmd' ? 'cmd' : r.c === 'err' ? 'err' : '');
+      const pm = /\((\d+)\s*%\)/.exec(r.s);
+      if (pm) setStatus('flashing ' + pm[1] + '%');
+    };
+    es.onerror = () => {
+      es.close();
+      curJob = null;
+      api('/api/job?id=' + id).then(resolve).catch(() => resolve({ status: 'failed' }));
+    };
+  });
+}
+
+async function build(upload) {
+  if (!ONLINE) return showOfflineHelp();
+  if (!HEALTH.ready) return openSetup();
+  if (upload && !SET.port) {
+    toast('Pick a port first', 'bad');
+    return $('#sel-port').focus();
+  }
+  await saveSketch(true);
+  showConsole('out');
+  St.diags = [];
+  paintProblems();
+  render();
+  setLed(upload ? 'flash' : 'build', 'on');
+  setStatus(upload ? 'compiling and flashing' : 'compiling');
+  $('#btn-verify').disabled = $('#btn-upload').disabled = true;
+  const t0 = performance.now();
+  try {
+    const { job } = await api(upload ? '/api/upload' : '/api/compile', {
+      name: St.sketch, files: St.files, fqbn: SET.fqbn, port: SET.port,
+      options: SET.options, clean: St.cleanNext, verify: false,
+    });
+    St.cleanNext = false;
+    const res = await followJob(job);
+    St.diags = res.diagnostics || [];
+    paintProblems();
+    render();
+    if (res.size) paintSize(res.size);
+    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    if (res.status === 'ok') {
+      setLed(upload ? 'flash' : 'build', 'ok');
+      logOut((upload ? 'Uploaded' : 'Compiled') + ' in ' + secs + ' s', 'ok');
+      setStatus((upload ? 'uploaded' : 'compiled') + ' in ' + secs + ' s');
+      toast(upload ? 'Uploaded to the board' : 'Compiled with no errors', 'good');
+      if (upload && !SERIAL_OPEN) setTimeout(() => openSerial(true), 700);
+    } else {
+      setLed(upload ? 'flash' : 'build', 'bad');
+      const errs = St.diags.filter(d => d.severity === 'error').length;
+      setStatus(errs ? errs + ' error' + (errs > 1 ? 's' : '') : 'build failed');
+      if (errs) {
+        showConsole('prob');
+        gotoDiag(St.diags.find(d => d.severity === 'error'));
+      } else {
+        explainFailure();
+      }
+      toast(errs ? 'Build stopped on ' + errs + ' error' + (errs > 1 ? 's' : '')
+                 : 'Build failed, see Output', 'bad');
+    }
+  } catch (e) {
+    logOut(String(e.message), 'err');
+    setLed(upload ? 'flash' : 'build', 'bad');
+    toast(e.message, 'bad');
+  } finally {
+    $('#btn-verify').disabled = $('#btn-upload').disabled = false;
+    setTimeout(() => { setLed('build', ''); setLed('flash', ''); }, 2500);
+  }
+}
+
+/* turn the common toolchain failures into something readable */
+function explainFailure() {
+  const text = $('#outlog').textContent;
+  const rules = [
+    [/Failed to connect to ESP32|Wrong boot mode|No serial data received/i,
+     'The board did not answer. Hold the BOOT button while the upload starts, ' +
+     'let go when it says Connecting, and check the cable can carry data.'],
+    [/A fatal error occurred: Could not open|Permission denied|Access is denied/i,
+     'The port is busy or you lack permission. Close other serial programs. ' +
+     'On Linux run: sudo usermod -aG dialout $USER, then log out and back in.'],
+    [/Sketch too big|text section exceeds|region .* overflowed/i,
+     'The firmware does not fit. In the Board tab pick a partition scheme with ' +
+     'more app space, such as Huge APP.'],
+    [/No such file or directory.*\.h/i,
+     'A header is missing. Search for the library in the Libraries tab and ' +
+     'install it.'],
+    [/Platform .* not found|platform not installed/i,
+     'ESP32 board support is not installed. Open Setup.'],
+    [/md5 of file does not match|Hash of data verified.*failed/i,
+     'The flash write did not verify. Try a lower upload speed in the Board tab.'],
+  ];
+  for (const [re, msg] of rules) {
+    if (re.test(text)) {
+      logOut('', '');
+      logOut('What this usually means: ' + msg, 'note');
+      return;
+    }
+  }
+}
+
+function paintSize(s) {
+  if (s.flashUsed && s.flashTotal) {
+    const pct = s.flashUsed / s.flashTotal * 100;
+    $('#bar-flash').style.width = Math.min(100, pct) + '%';
+    $('#bar-flash').className = pct > 90 ? 'hi' : '';
+    $('#st-flash').textContent = Math.round(s.flashUsed / 1024) + ' kB / ' +
+      Math.round(pct) + '%';
+  }
+  if (s.ramUsed && s.ramTotal) {
+    const pct = s.ramUsed / s.ramTotal * 100;
+    $('#bar-ram').style.width = Math.min(100, pct) + '%';
+    $('#bar-ram').className = pct > 85 ? 'hi' : '';
+    $('#st-ram').textContent = Math.round(s.ramUsed / 1024) + ' kB / ' +
+      Math.round(pct) + '%';
+  }
+}
+
+function paintProblems() {
+  const el = $('#problist'), c = $('#probcount');
+  const errs = St.diags.filter(d => d.severity === 'error').length;
+  const warns = St.diags.length - errs;
+  if (!St.diags.length) {
+    el.innerHTML = '<div class="empty">Nothing to report. Compiler errors and ' +
+      'warnings land here, and clicking one jumps to the line.</div>';
+    c.style.display = 'none';
+    return;
+  }
+  c.style.display = '';
+  c.textContent = St.diags.length;
+  c.className = 'count' + (errs ? '' : ' warn');
+  el.innerHTML = St.diags.map((d, i) =>
+    '<div class="prob ' + (d.severity === 'error' ? 'e' : 'w') + '" data-i="' + i + '">' +
+    '<span class="mk">' + (d.severity === 'error' ? '\u2715' : '!') + '</span>' +
+    '<span class="where">' + esc(d.file || '') + ':' + d.line + '</span>' +
+    '<span class="msg">' + esc(d.message) + '</span></div>').join('');
+  el.querySelectorAll('.prob').forEach(p =>
+    p.onclick = () => gotoDiag(St.diags[+p.dataset.i]));
+}
+
+function gotoDiag(d) {
+  if (!d) return;
+  if (d.file && St.files[d.file] && d.file !== St.active) openFile(d.file);
+  gotoLine(d.line);
+  const p = lcToPos(d.line - 1, Math.max(0, (d.col || 1) - 1));
+  ta.setSelectionRange(p, p);
+  scrollCaretIntoView();
+  render();
+}
+
+/* ---------------- boards and ports ---------------- */
+async function loadBoards() {
+  const sel = $('#sel-board');
+  const fallback = [
+    ['esp32:esp32:esp32', 'ESP32 Dev Module'],
+    ['esp32:esp32:esp32s3', 'ESP32-S3 Dev Module'],
+    ['esp32:esp32:esp32s2', 'ESP32-S2 Dev Module'],
+    ['esp32:esp32:esp32c3', 'ESP32-C3 Dev Module'],
+    ['esp32:esp32:esp32c6', 'ESP32-C6 Dev Module'],
+    ['esp32:esp32:nodemcu-32s', 'NodeMCU-32S'],
+    ['esp32:esp32:esp32doit-devkit-v1', 'DOIT ESP32 DEVKIT V1'],
+    ['esp32:esp32:lolin_s3', 'WEMOS LOLIN S3'],
+    ['esp32:esp32:XIAO_ESP32C3', 'Seeed XIAO ESP32C3'],
+    ['esp32:esp32:esp32thing', 'SparkFun ESP32 Thing'],
+  ];
+  let list = fallback.map(([fqbn, name]) => ({ fqbn, name }));
+  if (ONLINE) {
+    try {
+      const d = await api('/api/boards');
+      if (d.boards && d.boards.length) list = d.boards;
+    } catch (e) { /* keep the fallback */ }
+  }
+  sel.innerHTML = list.map(b =>
+    '<option value="' + b.fqbn + '">' + esc(b.name) + '</option>').join('');
+  sel.value = SET.fqbn || list[0].fqbn;
+  if (!sel.value) sel.value = list[0].fqbn;
+  applyBoard(sel.value);
+}
+
+async function loadPorts() {
+  const sel = $('#sel-port');
+  if (!ONLINE) {
+    sel.innerHTML = '<option value="">no helper</option>';
+    return;
+  }
+  try {
+    const d = await api('/api/ports');
+    const opts = d.ports.map(p => {
+      const tag = p.guess ? p.guess : (p.vid ? p.vid + ':' + p.pid : 'serial');
+      return '<option value="' + p.address + '">' + esc(p.address) +
+        '  \u00b7  ' + esc(tag) + '</option>';
+    });
+    sel.innerHTML = opts.length ? opts.join('')
+      : '<option value="">no board found</option>';
+    if (SET.port && d.ports.some(p => p.address === SET.port)) sel.value = SET.port;
+    else if (d.ports.length) { sel.value = d.ports[0].address; setPort(sel.value); }
+    else setPort('');
+    // if the connected board announces itself, offer to match the target
+    const match = d.ports.find(p => p.address === sel.value && p.guessFqbn);
+    if (match && match.guessFqbn !== SET.fqbn && !St.askedFqbn) {
+      St.askedFqbn = true;
+      toast('Board reports itself as ' + match.guess + '. Change the target if uploads fail.');
+    }
+  } catch (e) {
+    sel.innerHTML = '<option value="">port scan failed</option>';
+  }
+}
+
+function applyBoard(fqbn) {
+  SET.fqbn = fqbn;
+  $('#st-fqbn').textContent = fqbn;
+  drawPins();
+  saveSettings();
+  loadBoardOptions();
+}
+function setPort(p) {
+  SET.port = p;
+  $('#st-portv').textContent = p || 'none';
+  saveSettings();
+}
+$('#sel-board').onchange = e => applyBoard(e.target.value);
+$('#sel-port').onchange = e => setPort(e.target.value);
+$('#btn-rescan').onclick = () => { St.askedFqbn = false; loadPorts(); toast('Rescanned'); };
+
+async function loadBoardOptions() {
+  const box = $('#boardopts');
+  if (!ONLINE || !HEALTH.esp32Core) {
+    box.innerHTML = '<div class="hint" style="padding-left:0">Board options ' +
+      'appear once ESP32 support is installed.</div>';
+    return;
+  }
+  box.innerHTML = '<div class="hint" style="padding-left:0">reading board details</div>';
+  try {
+    const d = await api('/api/board-options?fqbn=' + encodeURIComponent(SET.fqbn));
+    if (!d.options.length) {
+      box.innerHTML = '<div class="hint" style="padding-left:0">This board has ' +
+        'no adjustable options.</div>';
+      return;
+    }
+    box.innerHTML = d.options.map(o => {
+      const chosen = (SET.options || {})[o.option];
+      return '<div class="field"><label class="silk">' + esc(o.label || o.option) +
+        '</label><select data-opt="' + o.option + '">' +
+        o.values.map(v => '<option value="' + esc(v.value) + '"' +
+          ((chosen ? chosen === v.value : v.selected) ? ' selected' : '') + '>' +
+          esc(v.label || v.value) + '</option>').join('') + '</select></div>';
+    }).join('');
+    box.querySelectorAll('select[data-opt]').forEach(s => s.onchange = () => {
+      SET.options = SET.options || {};
+      SET.options[s.dataset.opt] = s.value;
+      saveSettings();
+      toast(s.dataset.opt + ' set to ' + s.value);
+    });
+  } catch (e) {
+    box.innerHTML = '<div class="hint" style="padding-left:0">' +
+      esc(e.message) + '</div>';
+  }
+}
+
+/* ---------------- sketches and files ---------------- */
+async function loadSketchList() {
+  const el = $('#sketchlist');
+  if (!ONLINE) {
+    el.innerHTML = '<div class="hint">Saved sketches need the local helper.</div>';
+    return;
+  }
+  const d = await api('/api/sketches');
+  el.innerHTML = d.sketches.length
+    ? d.sketches.map(s => '<div class="row' + (s.name === St.sketch ? ' sel' : '') +
+        '" data-n="' + esc(s.name) + '"><span class="dot"></span>' +
+        '<span class="name">' + esc(s.name) + '</span>' +
+        '<button class="kill" title="Delete">\u00d7</button></div>').join('')
+    : '<div class="hint">No sketches yet. Press + to start one.</div>';
+  el.querySelectorAll('.row').forEach(r => {
+    r.onclick = e => {
+      if (e.target.closest('.kill')) return deleteSketch(r.dataset.n);
+      openSketch(r.dataset.n);
+    };
+  });
+}
+
+async function openSketch(name) {
+  const d = await api('/api/sketch?name=' + encodeURIComponent(name));
+  St.sketch = d.name;
+  St.files = d.files;
+  St.dirty.clear();
+  openFile(d.main in d.files ? d.main : Object.keys(d.files)[0]);
+  paintTabs();
+  loadSketchList();
+  SET.lastSketch = name;
+  saveSettings();
+  setStatus('opened ' + name);
+}
+
+async function newSketch() {
+  const name = prompt('Name for the new sketch (letters, numbers, underscore)');
+  if (!name) return;
+  if (!/^[A-Za-z0-9_][A-Za-z0-9_-]*$/.test(name))
+    return toast('Use letters, numbers, underscore or dash', 'bad');
+  try {
+    await api('/api/sketch/new', { name });
+    await openSketch(name);
+    toast('Created ' + name, 'good');
+  } catch (e) { toast(e.message, 'bad'); }
+}
+
+async function deleteSketch(name) {
+  if (!confirm('Delete the sketch ' + name + '? This cannot be undone.')) return;
+  await api('/api/sketch/delete', { name });
+  if (St.sketch === name) { St.sketch = null; St.files = {}; ta.value = ''; render(); }
+  loadSketchList();
+  toast('Deleted ' + name);
+}
+
+function newFile() {
+  if (!St.sketch) return toast('Open a sketch first', 'bad');
+  const name = prompt('New file name, for example helper.h');
+  if (!name) return;
+  if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(ino|h|hpp|c|cpp)$/.test(name))
+    return toast('Use an .ino, .h, .hpp, .c or .cpp name', 'bad');
+  const guard = name.replace(/\W/g, '_').toUpperCase();
+  St.files[name] = /\.(h|hpp)$/.test(name)
+    ? '#pragma once\n#include <Arduino.h>\n\n' : '#include <Arduino.h>\n\n';
+  St.dirty.add(name);
+  openFile(name);
+  paintTabs();
+}
+
+function openFile(name) {
+  if (St.active && St.files[St.active] !== undefined) St.files[St.active] = ta.value;
+  St.active = name;
+  ta.value = St.files[name] ?? '';
+  ta.setSelectionRange(0, 0);
+  scanDocument();
+  render();
+  updateOutline();
+  updatePinUse();
+  paintTabs();
+  paintFileList();
+  ta.focus();
+}
+
+function paintTabs() {
+  const el = $('#tabs');
+  const names = Object.keys(St.files);
+  el.innerHTML = names.map(n => '<div class="tab' + (n === St.active ? ' sel' : '') +
+    '" data-n="' + esc(n) + '">' +
+    (St.dirty.has(n) ? '<span class="mod">\u2022</span>' : '') +
+    '<span>' + esc(n) + '</span></div>').join('') ||
+    '<div class="tab">no file open</div>';
+  el.querySelectorAll('.tab[data-n]').forEach(t =>
+    t.onclick = () => openFile(t.dataset.n));
+}
+
+function paintFileList() {
+  const el = $('#filelist');
+  const names = Object.keys(St.files);
+  el.innerHTML = names.length
+    ? names.map(n => '<div class="row' + (n === St.active ? ' sel' : '') +
+        '" data-n="' + esc(n) + '"><span class="dot"></span>' +
+        '<span class="name">' + esc(n) + '</span></div>').join('')
+    : '<div class="hint">Open a sketch to see its files.</div>';
+  el.querySelectorAll('.row').forEach(r => r.onclick = () => openFile(r.dataset.n));
+}
+
+function markDirty() {
+  if (!St.active) return;
+  St.files[St.active] = ta.value;
+  if (!St.dirty.has(St.active)) { St.dirty.add(St.active); paintTabs(); }
+}
+
+async function saveSketch(quiet) {
+  if (!St.sketch) {
+    if (!ONLINE) return;
+    return quiet ? null : toast('Nothing open to save', 'bad');
+  }
+  if (St.active) St.files[St.active] = ta.value;
+  if (!ONLINE) return quiet ? null : showOfflineHelp();
+  await api('/api/sketch', { name: St.sketch, files: St.files });
+  St.dirty.clear();
+  paintTabs();
+  if (!quiet) { toast('Saved', 'good'); setStatus('saved'); }
+}
+
+function saveSettings() {
+  if (!ONLINE) return;
+  clearTimeout(saveSettings.t);
+  saveSettings.t = setTimeout(() => api('/api/settings', {
+    fqbn: SET.fqbn, port: SET.port, options: SET.options,
+    baud: +$('#sel-baud').value, lastSketch: SET.lastSketch,
+  }).catch(() => {}), 300);
+}
+
+/* ---------------- serial monitor ---------------- */
+let SERIAL_OPEN = false;
+const plot = { series: new Map(), max: 240, on: false };
+
+async function openSerial(silent) {
+  if (!ONLINE) return showOfflineHelp();
+  if (!HEALTH.pyserial)
+    return modal('Serial monitor', '<p>The monitor needs pyserial:</p>' +
+      '<p><code>pip install pyserial</code></p><p>Then restart the helper.</p>');
+  if (!SET.port) return toast('Pick a port first', 'bad');
+  try {
+    await api('/api/serial/open', { port: SET.port, baud: +$('#sel-baud').value });
+    SERIAL_OPEN = true;
+    $('#btn-monitor').textContent = 'Close monitor';
+    showConsole('ser');
+    startSerialStream();
+    if (!silent) toast('Monitor open on ' + SET.port, 'good');
+  } catch (e) { toast(e.message, 'bad'); }
+}
+
+async function closeSerial() {
+  try { await api('/api/serial/close', {}); } catch (e) {}
+  SERIAL_OPEN = false;
+  $('#btn-monitor').innerHTML = 'Monitor <kbd>^M</kbd>';
+  setLed('rx', ''); setLed('tx', '');
+}
+
+function startSerialStream() {
+  if (serialES) return;
+  serialES = new EventSource('/api/serial/stream');
+  serialES.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.type === 'data') { serialWrite(m.text); blip('rx'); }
+    else if (m.type === 'tx') { serialWrite(m.text, 'tx'); blip('tx'); }
+    else if (m.type === 'open') {
+      SERIAL_OPEN = true;
+      $('#btn-monitor').textContent = 'Close monitor';
+      serialWrite('\u2014 open on ' + m.port + ' at ' + m.baud + ' baud \u2014\n', 'sys');
+    } else if (m.type === 'closed') {
+      SERIAL_OPEN = false;
+      $('#btn-monitor').innerHTML = 'Monitor <kbd>^M</kbd>';
+      serialWrite('\u2014 port closed \u2014\n', 'sys');
+    } else if (m.type === 'note') serialWrite('\u2014 ' + m.text + ' \u2014\n', 'sys');
+    else if (m.type === 'error') serialWrite('\u2014 ' + m.message + ' \u2014\n', 'sys');
+    else if (m.type === 'hello' && m.open) SERIAL_OPEN = true;
+  };
+  serialES.onerror = () => { serialES.close(); serialES = null; };
+}
+
+let serPartial = '';
+function serialWrite(text, cls) {
+  const el = $('#serlog');
+  const auto = $('#cb-auto').checked;
+  const stamp = $('#cb-ts').checked;
+  const chunks = (serPartial + text).split('\n');
+  serPartial = chunks.pop();
+  for (const line of chunks) {
+    const d = document.createElement('div');
+    if (cls) d.className = cls;
+    if (stamp) {
+      const t = new Date();
+      const s = document.createElement('span');
+      s.className = 'ts';
+      s.textContent = t.toTimeString().slice(0, 8) + '.' +
+        String(t.getMilliseconds()).padStart(3, '0') + '  ';
+      d.appendChild(s);
+    }
+    d.appendChild(document.createTextNode(line));
+    el.appendChild(d);
+    if (plot.on && !cls) feedPlot(line);
+  }
+  if (serPartial.length > 4000) { serialWrite('\n'); }
+  while (el.childElementCount > 3000) el.removeChild(el.firstChild);
+  if (auto) el.scrollTop = el.scrollHeight;
+}
+
+$('#btn-monitor').onclick = () => SERIAL_OPEN ? closeSerial() : openSerial();
+$('#sertx').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const v = e.target.value;
+  if (!v || !SERIAL_OPEN) return;
+  const map = { '\\n': '\n', '\\r\\n': '\r\n', '\\r': '\r', '': '' };
+  api('/api/serial/send', { text: v, ending: map[$('#sel-ending').value] ?? '\n' })
+    .catch(err => toast(err.message, 'bad'));
+  e.target.value = '';
+});
+$('#sel-baud').onchange = async () => {
+  saveSettings();
+  if (SERIAL_OPEN) { await closeSerial(); openSerial(true); }
+};
+$('#cb-plot').onchange = e => {
+  plot.on = e.target.checked;
+  $('#plot').classList.toggle('on', plot.on);
+  if (plot.on) { sizePlot(); drawPlot(); }
+};
+
+/* plotter */
+function feedPlot(line) {
+  const t = line.trim();
+  if (!t) return;
+  let pairs = [];
+  if (/[A-Za-z_]\w*\s*[:=]\s*-?[\d.]+/.test(t)) {
+    for (const m of t.matchAll(/([A-Za-z_]\w*)\s*[:=]\s*(-?[\d.]+)/g))
+      pairs.push([m[1], parseFloat(m[2])]);
+  } else {
+    const nums = t.split(/[\s,;\t]+/).filter(x => /^-?\d*\.?\d+$/.test(x));
+    if (!nums.length) return;
+    pairs = nums.map((v, i) => ['series ' + (i + 1), parseFloat(v)]);
+  }
+  for (const [k, v] of pairs) {
+    if (!Number.isFinite(v)) continue;
+    if (!plot.series.has(k)) plot.series.set(k, []);
+    const a = plot.series.get(k);
+    a.push(v);
+    if (a.length > plot.max) a.shift();
+  }
+  if (!plot.raf) plot.raf = requestAnimationFrame(() => { plot.raf = null; drawPlot(); });
+}
+
+function sizePlot() {
+  const cv = $('#plotcv');
+  cv.width = cv.clientWidth * devicePixelRatio;
+  cv.height = 118 * devicePixelRatio;
+}
+
+function drawPlot() {
+  const cv = $('#plotcv');
+  if (!cv.width) sizePlot();
+  const g = cv.getContext('2d');
+  const W = cv.width, H = cv.height, dpr = devicePixelRatio;
+  g.clearRect(0, 0, W, H);
+  const all = [...plot.series.values()].flat();
+  if (!all.length) return;
+  let lo = Math.min(...all), hi = Math.max(...all);
+  if (hi - lo < 1e-6) { hi += 1; lo -= 1; }
+  const pad = (hi - lo) * 0.12;
+  lo -= pad; hi += pad;
+  g.strokeStyle = '#1C2F29'; g.lineWidth = 1 * dpr;
+  g.font = (9 * dpr) + 'px monospace'; g.fillStyle = '#546962';
+  for (let i = 0; i <= 3; i++) {
+    const y = H * i / 3;
+    g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+    g.fillText((hi - (hi - lo) * i / 3).toFixed(2), 3 * dpr, y + 10 * dpr);
+  }
+  const colors = ['#E3B457', '#62B6D8', '#46C98B', '#B18AD6', '#E4563C'];
+  let ci = 0, legend = [];
+  for (const [name, data] of plot.series) {
+    const c = colors[ci++ % colors.length];
+    g.strokeStyle = c; g.lineWidth = 1.6 * dpr;
+    g.beginPath();
+    data.forEach((v, i) => {
+      const x = W * i / Math.max(1, plot.max - 1);
+      const y = H - (v - lo) / (hi - lo) * H;
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    });
+    g.stroke();
+    legend.push([name, c, data[data.length - 1]]);
+    ci++;
+  }
+  let lx = W - 8 * dpr;
+  g.textAlign = 'right';
+  legend.forEach(([n, c, v], i) => {
+    g.fillStyle = c;
+    g.fillText(n + '  ' + (v != null ? v.toFixed(2) : ''), lx, (12 + i * 11) * dpr);
+  });
+  g.textAlign = 'left';
+}
+addEventListener('resize', () => { if (plot.on) { sizePlot(); drawPlot(); } measure(); render(); });
+
+/* ---------------- libraries ---------------- */
+let libMode = 'inst';
+$('#libtab-inst').onclick = () => { libMode = 'inst'; syncLibTabs(); loadInstalled(); };
+$('#libtab-find').onclick = () => { libMode = 'find'; syncLibTabs(); searchLibs(); };
+function syncLibTabs() {
+  $('#libtab-inst').classList.toggle('on', libMode === 'inst');
+  $('#libtab-find').classList.toggle('on', libMode === 'find');
+}
+$('#libgo').onclick = () => { libMode = 'find'; syncLibTabs(); searchLibs(); };
+$('#libq').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { libMode = 'find'; syncLibTabs(); searchLibs(); }
+});
+
+async function loadInstalled() {
+  const el = $('#libresults');
+  if (!ONLINE || !HEALTH.cli) {
+    el.innerHTML = '<div class="hint" style="padding-left:0">Library management ' +
+      'needs the local helper and arduino-cli.</div>';
+    return;
+  }
+  el.innerHTML = '<div class="hint" style="padding-left:0">reading</div>';
+  try {
+    const d = await api('/api/libs/installed');
+    if (!d.libs.length) {
+      el.innerHTML = '<div class="hint" style="padding-left:0">Nothing installed ' +
+        'beyond what ships with the ESP32 core. Try the Registry tab.</div>';
+      return;
+    }
+    el.innerHTML = d.libs.map(e => {
+      const l = e.library || {};
+      return '<div class="card"><h5>' + esc(l.name || '') +
+        '<span class="v">' + esc(l.version || '') + '</span></h5>' +
+        '<p>' + esc(l.sentence || '') + '</p><div class="foot">' +
+        '<span class="who">' + esc(l.author || '') + '</span>' +
+        '<button class="mini" data-inc="' + esc((l.name || '')) + '">Include</button>' +
+        '<button class="mini" data-rm="' + esc(l.name || '') + '">Remove</button>' +
+        '</div></div>';
+    }).join('');
+    wireLibButtons();
+  } catch (e) {
+    el.innerHTML = '<div class="hint" style="padding-left:0">' + esc(e.message) + '</div>';
+  }
+}
+
+async function searchLibs() {
+  const el = $('#libresults'), q = $('#libq').value.trim();
+  if (!ONLINE || !HEALTH.cli) return loadInstalled();
+  el.innerHTML = '<div class="hint" style="padding-left:0">searching</div>';
+  try {
+    const d = await api('/api/libs/search?q=' + encodeURIComponent(q));
+    if (!d.libs.length) {
+      el.innerHTML = '<div class="hint" style="padding-left:0">No matches. ' +
+        'Try a shorter word.</div>';
+      return;
+    }
+    const esp = d.libs.filter(l => !l.architectures.length ||
+      l.architectures.includes('*') || l.architectures.includes('esp32'));
+    const rest = d.libs.filter(l => !esp.includes(l));
+    el.innerHTML = [...esp, ...rest].slice(0, 60).map(l =>
+      '<div class="card"><h5>' + esc(l.name) + '<span class="v">' +
+      esc(l.version) + '</span></h5><p>' + esc(l.sentence) + '</p>' +
+      '<div class="foot"><span class="who">' + esc(l.author) +
+      (esp.includes(l) ? '' : ' \u00b7 not listed for esp32') + '</span>' +
+      '<button class="mini" data-add="' + esc(l.name) + '">Install</button>' +
+      '</div></div>').join('');
+    wireLibButtons();
+  } catch (e) {
+    el.innerHTML = '<div class="hint" style="padding-left:0">' + esc(e.message) + '</div>';
+  }
+}
+
+function wireLibButtons() {
+  $$('#libresults [data-add]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    b.textContent = 'installing';
+    showConsole('out');
+    const { job } = await api('/api/libs/install', { name: b.dataset.add });
+    const res = await followJob(job);
+    b.textContent = res.status === 'ok' ? 'installed' : 'failed';
+    toast(res.status === 'ok' ? b.dataset.add + ' installed'
+                              : 'Install failed, see Output',
+          res.status === 'ok' ? 'good' : 'bad');
+  });
+  $$('#libresults [data-rm]').forEach(b => b.onclick = async () => {
+    if (!confirm('Remove ' + b.dataset.rm + '?')) return;
+    b.disabled = true;
+    const { job } = await api('/api/libs/uninstall', { name: b.dataset.rm });
+    await followJob(job);
+    loadInstalled();
+  });
+  $$('#libresults [data-inc]').forEach(b => b.onclick = () => {
+    const guess = b.dataset.inc.replace(/\s+/g, '_') + '.h';
+    const known = HEADERS.find(h =>
+      h.label.toLowerCase().startsWith(b.dataset.inc.split(' ')[0].toLowerCase()));
+    addInclude(known ? known.label : guess);
+  });
+}
+
+function addInclude(header) {
+  const line = '#include <' + header + '>';
+  if (ta.value.includes(line)) return toast('Already included');
+  insert(line + '\n', 0, 0);
+  ta.setSelectionRange(line.length + 1, line.length + 1);
+  render();
+  toast('Added ' + line);
+}
+
+/* ---------------- snippets panel ---------------- */
+function paintSnippets(filter) {
+  const q = (filter || '').toLowerCase();
+  const list = SNIPPETS.filter(s => !q || s.label.includes(q) ||
+    s.title.toLowerCase().includes(q) || s.note.toLowerCase().includes(q));
+  $('#sniplist').innerHTML = list.map((s, i) =>
+    '<div class="snip" data-l="' + esc(s.label) + '"><b>' + esc(s.title) +
+    '</b><small>' + esc(s.note) + '  \u00b7  type ' + esc(s.label) +
+    '</small></div>').join('') ||
+    '<div class="hint" style="padding-left:0">No snippet matches that.</div>';
+  $$('#sniplist .snip').forEach(el => el.onclick = () => {
+    const s = SNIPPETS.find(x => x.label === el.dataset.l);
+    if (!s) return;
+    ta.focus();
+    const pos = ta.selectionStart;
+    const src = ta.value;
+    const atLineStart = pos === 0 || src[pos - 1] === '\n';
+    insertSnippet((atLineStart ? '' : '\n') + s.body, pos, ta.selectionEnd);
+    toast('Inserted ' + s.title);
+  });
+}
+$('#snipq').addEventListener('input', e => paintSnippets(e.target.value));
+
+/* ---------------- pin map ---------------- */
+let PINS = { name: '', pins: [] };
+
+function drawPins() {
+  PINS = buildPins(familyFor(SET.fqbn));
+  $('#boardname').textContent = PINS.name + '  \u00b7  by gpio number';
+  const half = Math.ceil(PINS.pins.length / 2);
+  const col = (arr, side) => '<div class="col ' + side + '">' + arr.map(p =>
+    '<div class="pin' + (p.warn ? ' warn' : '') + '" data-p="' + p.n + '">' +
+    '<span class="pad"></span><span class="n">GPIO' + p.n + '</span>' +
+    '<span style="color:var(--dim);font-size:9.5px;overflow:hidden;' +
+    'text-overflow:ellipsis;white-space:nowrap">' +
+    esc(p.tags.filter(t => t !== 'PWM' && t !== 'RTC').slice(0, 2).join(' ')) +
+    '</span></div>').join('') + '</div>';
+  $('#pins').innerHTML = col(PINS.pins.slice(0, half), 'left') +
+    '<div class="spine"></div>' + col(PINS.pins.slice(half), 'right');
+  $$('#pins .pin').forEach(el => {
+    el.onclick = () => showPin(+el.dataset.p);
+    el.onmouseenter = () => showPin(+el.dataset.p);
+  });
+  updatePinUse();
+}
+
+function showPin(n) {
+  const p = PINS.pins.find(x => x.n === n);
+  if (!p) return;
+  const used = St.usedPins && St.usedPins.has(n);
+  $('#pindoc').innerHTML = '<h4>GPIO' + n + (used ? '  \u00b7  used in this sketch' : '') +
+    '</h4>' + (p.notes.length ? p.notes.map(esc).join(' ') :
+      'General purpose. No special limits.') +
+    '<div class="tags">' + p.tags.map(t => '<span class="tag' +
+      (['flash', 'strapping', 'input only', 'ADC2', 'USB', 'psram'].includes(t)
+        ? ' bad' : '') + '">' + esc(t) + '</span>').join('') + '</div>';
+}
+
+function updatePinUse() {
+  const src = ta.value || '';
+  const consts = {};
+  for (const m of src.matchAll(/#define\s+(\w+)\s+(\d+)\b/g)) consts[m[1]] = +m[2];
+  for (const m of src.matchAll(/\b(?:const\s+)?(?:int|uint8_t|byte|gpio_num_t)\s+(\w+)\s*=\s*(?:GPIO_NUM_)?(\d+)/g))
+    consts[m[1]] = +m[2];
+  const used = new Set();
+  const take = v => {
+    v = v.trim();
+    let n = /^\d+$/.test(v) ? +v
+      : /^GPIO_NUM_(\d+)$/.test(v) ? +RegExp.$1
+      : consts[v];
+    if (Number.isInteger(n) && n >= 0 && n <= 48) used.add(n);
+  };
+  const single = /\b(?:pinMode|digitalWrite|digitalRead|analogRead|analogReadMilliVolts|analogWrite|touchRead|dacWrite|ledcAttach|ledcWrite|ledcDetach|attachInterrupt|detachInterrupt|pulseIn|tone|noTone|touchAttachInterrupt|digitalPinToInterrupt|esp_sleep_enable_ext0_wakeup)\s*\(\s*([A-Za-z_]\w*|\d+|GPIO_NUM_\d+)/g;
+  for (const m of src.matchAll(single)) take(m[1]);
+  for (const m of src.matchAll(/\.attach\s*\(\s*([A-Za-z_]\w*|\d+)/g)) take(m[1]);
+  for (const m of src.matchAll(/Wire1?\.(?:begin|setPins)\s*\(([^)]*)\)/g))
+    m[1].split(',').slice(0, 2).forEach(take);
+  for (const m of src.matchAll(/SPI\.begin\s*\(([^)]*)\)/g))
+    m[1].split(',').slice(0, 4).forEach(take);
+  for (const m of src.matchAll(/Adafruit_NeoPixel\s*\w*\s*\(\s*[^,]+,\s*([A-Za-z_]\w*|\d+)/g))
+    take(m[1]);
+  St.usedPins = used;
+  $$('#pins .pin').forEach(el =>
+    el.classList.toggle('used', used.has(+el.dataset.p)));
+  const risky = [...used].filter(n => {
+    const p = PINS.pins.find(x => x.n === n);
+    return p && p.tags.some(t => ['flash', 'psram', 'USB'].includes(t));
+  });
+  if (risky.length && !St.warnedPins) {
+    St.warnedPins = true;
+    toast('GPIO' + risky.join(', GPIO') + ' is reserved on this chip. Check the Pins tab.', 'bad');
+  }
+}
+
+/* ---------------- tools ---------------- */
+$('#btn-clean').onclick = () => {
+  St.cleanNext = true;
+  toast('Next build starts from scratch');
+  build(false);
+};
+$('#btn-update').onclick = async () => {
+  showConsole('out');
+  const { job } = await api('/api/setup', { step: 'update' });
+  await followJob(job);
+  await checkHealth();
+  toast('Core and index updated');
+};
+$('#btn-erase').onclick = async () => {
+  if (!confirm('Erase the entire flash on the connected board? Firmware, ' +
+      'saved settings and files all go away.')) return;
+  showConsole('out');
+  try {
+    const { job } = await api('/api/erase', { port: SET.port });
+    const res = await followJob(job);
+    toast(res.status === 'ok' ? 'Flash erased' : 'Erase failed, see Output',
+          res.status === 'ok' ? 'good' : 'bad');
+  } catch (e) { toast(e.message, 'bad'); }
+};
+$('#cb-ghost').onchange = e => {
+  St.ghostOn = e.target.checked;
+  if (!St.ghostOn) clearGhost();
+};
+$('#cb-acauto').onchange = e => { St.acAuto = e.target.checked; };
+
+/* ---------------- buttons and shortcuts ---------------- */
+$('#btn-verify').onclick = () => build(false);
+$('#btn-upload').onclick = () => build(true);
+$('#btn-save').onclick = () => saveSketch(false);
+$('#btn-newsketch').onclick = newSketch;
+$('#btn-newfile').onclick = newFile;
+$('#btn-setup').onclick = openSetup;
+$('#btn-help').onclick = showHelp;
+$('#st-board').onclick = () => $('#sel-board').focus();
+$('#st-port').onclick = () => $('#sel-port').focus();
+$('#mob-side').onclick = () => $('#side').classList.toggle('open');
+$('#mob-insp').onclick = () => $('#insp').classList.toggle('open');
+
+function showHelp() {
+  modal('Keyboard', `
+    <div class="fields" style="gap:0">
+    ${[['Ctrl R', 'Verify, which compiles without flashing'],
+       ['Ctrl U', 'Upload to the board'],
+       ['Ctrl M', 'Open or close the serial monitor'],
+       ['Ctrl S', 'Save the sketch'],
+       ['Tab', 'Take the whole grey prediction, or jump to the next snippet field'],
+       ['Right arrow', 'Take one word of the prediction'],
+       ['Ctrl Space', 'Open the suggestion list on demand'],
+       ['Ctrl Shift P', 'Ask a model for a longer continuation'],
+       ['Ctrl F', 'Find in this file'],
+       ['Ctrl G', 'Go to a line number'],
+       ['Ctrl /', 'Comment or uncomment the selection'],
+       ['Ctrl D', 'Duplicate the current line'],
+       ['Alt Up, Alt Down', 'Move the current line'],
+       ['Ctrl Z', 'Undo, the normal one'],
+       ['Escape', 'Dismiss the suggestion or prediction']]
+      .map(([k, v]) => '<div class="step"><span class="num" style="width:110px;' +
+        'font-family:var(--mono);color:var(--gold)">' + k + '</span>' +
+        '<span class="txt"><small style="color:var(--muted)">' + v +
+        '</small></span></div>').join('')}
+    </div>`);
+}
+
+addEventListener('keydown', e => {
+  const mod = e.ctrlKey || e.metaKey;
+  if (!mod) return;
+  const k = e.key.toLowerCase();
+  if (k === 'r') { e.preventDefault(); build(false); }
+  else if (k === 'u') { e.preventDefault(); build(true); }
+  else if (k === 's') { e.preventDefault(); saveSketch(false); }
+  else if (k === 'm') { e.preventDefault(); SERIAL_OPEN ? closeSerial() : openSerial(); }
+  else if (k === 'f' && document.activeElement === ta) { e.preventDefault(); openFind(); }
+  else if (k === 'g') {
+    e.preventDefault();
+    const n = prompt('Go to line');
+    if (n) gotoLine(parseInt(n, 10) || 1);
+  } else if (k === '/' && document.activeElement === ta) {
+    e.preventDefault();
+    toggleComment();
+  } else if (k === 'd' && document.activeElement === ta) {
+    e.preventDefault();
+    duplicateLine();
+  }
+});
+addEventListener('keydown', e => {
+  if (!e.altKey || document.activeElement !== ta) return;
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    moveLine(e.key === 'ArrowUp' ? -1 : 1);
+  }
+});
+
+function toggleComment() {
+  const src = ta.value;
+  let a = src.lastIndexOf('\n', ta.selectionStart - 1) + 1;
+  let b = src.indexOf('\n', ta.selectionEnd);
+  if (b === -1) b = src.length;
+  const rows = src.slice(a, b).split('\n');
+  const all = rows.every(r => !r.trim() || /^\s*\/\//.test(r));
+  const out = rows.map(r => all ? r.replace(/^(\s*)\/\/ ?/, '$1')
+                                : (r.trim() ? r.replace(/^(\s*)/, '$1// ') : r)).join('\n');
+  insert(out, a, b);
+  ta.setSelectionRange(a, a + out.length);
+  render();
+}
+
+function duplicateLine() {
+  const src = ta.value;
+  const a = src.lastIndexOf('\n', ta.selectionStart - 1) + 1;
+  let b = src.indexOf('\n', ta.selectionStart);
+  if (b === -1) b = src.length;
+  const row = src.slice(a, b);
+  const keep = ta.selectionStart;
+  insert('\n' + row, b, b);
+  ta.setSelectionRange(keep + row.length + 1, keep + row.length + 1);
+  render();
+}
+
+function moveLine(dir) {
+  const ls = lines();
+  const p = posToLC(ta.selectionStart);
+  const i = p.line, j = i + dir;
+  if (j < 0 || j >= ls.length) return;
+  const tmp = ls[i]; ls[i] = ls[j]; ls[j] = tmp;
+  const joined = ls.join('\n');
+  const col = p.col;
+  insert(joined, 0, ta.value.length);
+  const np = lcToPos(j, col);
+  ta.setSelectionRange(np, np);
+  render();
+  scrollCaretIntoView();
+}
+
+/* console resize */
+(() => {
+  const bar = $('#drag'), box = $('#console');
+  let start = 0, h0 = 0, on = false;
+  const down = e => {
+    on = true;
+    start = (e.touches ? e.touches[0].clientY : e.clientY);
+    h0 = box.offsetHeight;
+    e.preventDefault();
+  };
+  const move = e => {
+    if (!on) return;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY);
+    box.style.height = Math.max(26, Math.min(innerHeight - 160, h0 - (y - start))) + 'px';
+    measure(); render();
+  };
+  const up = () => { on = false; };
+  bar.addEventListener('mousedown', down);
+  bar.addEventListener('touchstart', down, { passive: false });
+  addEventListener('mousemove', move);
+  addEventListener('touchmove', move, { passive: false });
+  addEventListener('mouseup', up);
+  addEventListener('touchend', up);
+})();
+
+addEventListener('beforeunload', e => {
+  if (St.dirty.size) { e.preventDefault(); e.returnValue = ''; }
+});
+
+/* ---------------- boot ---------------- */
+const DEMO = `#include <WiFi.h>
+
+// ESP32 Studio. Nothing here needs the internet: try typing and watch the
+// grey text guess the rest, then press Tab to take it.
+//
+// Ctrl+R verifies, Ctrl+U uploads, Ctrl+M opens the serial monitor.
+
+const int LED = 2;
+uint32_t lastBlink = 0;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(LED, OUTPUT);
+  Serial.printf("%s awake, %u kB free\\n",
+                ESP.getChipModel(), ESP.getFreeHeap() / 1024);
+}
+
+void loop() {
+  if (millis() - lastBlink >= 500) {
+    lastBlink = millis();
+    digitalWrite(LED, !digitalRead(LED));
+  }
+}
+`;
+
+async function boot() {
+  measure();
+  paintSnippets('');
+  paintProblems();
+  drawPins();
+  await checkHealth();
+  if (ONLINE) {
+    try { SET = await api('/api/settings'); } catch (e) { SET = {}; }
+    $('#sel-baud').value = String(SET.baud || 115200);
+  }
+  SET.fqbn = SET.fqbn || 'esp32:esp32:esp32';
+  SET.options = SET.options || {};
+  await loadBoards();
+  await loadPorts();
+  if (ONLINE) {
+    await loadSketchList();
+    let opened = false;
+    try {
+      const d = await api('/api/sketches');
+      const want = SET.lastSketch && d.sketches.find(s => s.name === SET.lastSketch);
+      const pick = want || d.sketches[0];
+      if (pick) { await openSketch(pick.name); opened = true; }
+    } catch (e) {}
+    if (!opened) {
+      try {
+        await api('/api/sketch/new', { name: 'first_sketch', code: DEMO });
+        await openSketch('first_sketch');
+      } catch (e) {
+        St.files = { 'first_sketch.ino': DEMO };
+        openFile('first_sketch.ino');
+      }
+    }
+    setInterval(loadPorts, 6000);
+    startSerialStream();
+  } else {
+    St.sketch = null;
+    St.files = { 'sketch.ino': DEMO };
+    openFile('sketch.ino');
+    loadSketchList();
+  }
+  logOut('ESP32 Studio ready.' + (ONLINE ? '' :
+    ' Editor only, since the local helper is not running.'), 'note');
+  if (ONLINE && HEALTH.cliVersion)
+    logOut('arduino-cli ' + HEALTH.cliVersion +
+      (HEALTH.esp32Core ? ', esp32 core ' + HEALTH.esp32Core :
+        ', esp32 core not installed'), 'note');
+  setStatus('ready');
+  ta.focus();
+  setInterval(() => { if (St.dirty.size && St.sketch && ONLINE) saveSketch(true); }, 20000);
+}
+boot();
+</script>
+</body>
+</html>

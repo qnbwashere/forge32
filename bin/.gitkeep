@@ -1,0 +1,2 @@
+The release workflow downloads the platform-correct arduino-cli into this
+folder before packaging. Nothing to commit here.

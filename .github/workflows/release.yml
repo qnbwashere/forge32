@@ -1,0 +1,81 @@
+name: Build installers
+
+# Tag a commit and the installers appear on the Releases page:
+#   git tag v1.0.0 && git push origin v1.0.0
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS (Apple silicon)
+            os: macos-14
+            cli: arduino-cli_latest_macOS_ARM64.tar.gz
+            flags: --mac --arm64
+          - label: macOS (Intel)
+            os: macos-14
+            cli: arduino-cli_latest_macOS_64bit.tar.gz
+            flags: --mac --x64
+          - label: Windows
+            os: windows-latest
+            cli: arduino-cli_latest_Windows_64bit.zip
+            flags: --win --x64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The compiler toolchain driver ships inside the installer so the user
+      # never has to install anything by hand.
+      - name: Fetch arduino-cli (unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p bin
+          curl -fsSL -o cli.tar.gz "https://downloads.arduino.cc/arduino-cli/${{ matrix.cli }}"
+          tar -xzf cli.tar.gz -C bin arduino-cli
+          chmod +x bin/arduino-cli
+          bin/arduino-cli version
+
+      - name: Fetch arduino-cli (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path bin | Out-Null
+          Invoke-WebRequest -Uri "https://downloads.arduino.cc/arduino-cli/${{ matrix.cli }}" -OutFile cli.zip
+          Expand-Archive cli.zip -DestinationPath bin -Force
+          .\bin\arduino-cli.exe version
+
+      - name: Install build tools
+        run: npm install --no-audit --no-fund
+
+      - name: Build installer
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder ${{ matrix.flags }} --publish never
+
+      - name: Publish to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name != 'main' && github.ref_name || 'nightly' }}
+          name: FORGE32 ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: false
+          files: |
+            dist/FORGE32-mac-arm64.dmg
+            dist/FORGE32-mac-x64.dmg
+            dist/FORGE32-win-x64.exe
