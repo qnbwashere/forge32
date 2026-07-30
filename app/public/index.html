@@ -55,7 +55,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- edge connector rail (signature) ---------- */
 #rail{
-  grid-area:rail; background:var(--panel);
+  grid-area:rail; background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);
   border-right:1px solid var(--trace);
   display:flex; flex-direction:column; align-items:center; gap:2px;
   padding:7px 0; position:relative;
@@ -67,16 +67,18 @@ button,input,select,textarea{font:inherit;color:inherit}
   opacity:.3; margin:0 9px;
 }
 .led{
-  width:8px;height:8px;border-radius:50%;
-  background:#132a22; border:1px solid #1e3b31; margin:5px 0;
+  width:9px;height:9px;border-radius:50%;margin:5px 0;
+  background:radial-gradient(circle at 32% 28%,#1a3229 0%,#0d1a15 70%);
+  box-shadow:inset 0 1px 1.5px rgba(0,0,0,.7),inset 0 -0.5px 0 rgba(255,255,255,.03),
+    0 0.5px 0 rgba(255,255,255,.04);
   transition:background .12s, box-shadow .12s;
 }
-.led.on{background:var(--gold);box-shadow:0 0 7px 1px rgba(227,180,87,.7);
-  border-color:var(--gold)}
-.led.ok{background:var(--ok);box-shadow:0 0 7px 1px rgba(70,201,139,.6);
-  border-color:var(--ok)}
-.led.bad{background:var(--hot);box-shadow:0 0 7px 1px rgba(228,86,60,.6);
-  border-color:var(--hot)}
+.led.on{background:radial-gradient(circle at 32% 28%,#fff6db 0%,var(--gold) 55%,#8a651f 100%);
+  box-shadow:inset 0.5px 0.5px 1px rgba(255,255,255,.8),0 0 7px 1.5px rgba(227,180,87,.75)}
+.led.ok{background:radial-gradient(circle at 32% 28%,#d9ffe9 0%,var(--ok) 55%,#1f6b46 100%);
+  box-shadow:inset 0.5px 0.5px 1px rgba(255,255,255,.8),0 0 7px 1.5px rgba(70,201,139,.65)}
+.led.bad{background:radial-gradient(circle at 32% 28%,#ffd9d0 0%,var(--hot) 55%,#8a2a18 100%);
+  box-shadow:inset 0.5px 0.5px 1px rgba(255,255,255,.8),0 0 7px 1.5px rgba(228,86,60,.65)}
 .railtag{font-family:var(--cond);font-size:8px;letter-spacing:.1em;
   color:var(--dim);text-transform:uppercase;margin-bottom:9px}
 #rail .spacer{flex:1}
@@ -89,7 +91,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- top bar ---------- */
 #top{
-  grid-area:top; background:var(--panel);
+  grid-area:top; background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);
   border-bottom:1px solid var(--trace);
   display:flex; align-items:center; gap:10px; padding:0 10px 0 12px;
 }
@@ -107,15 +109,33 @@ button,input,select,textarea{font:inherit;color:inherit}
 .pick:hover{border-color:var(--pad)}
 .btn{
   display:inline-flex;align-items:center;gap:6px;
-  background:var(--panel2); border:1px solid var(--trace2); color:var(--flux);
-  padding:5px 11px; border-radius:3px; cursor:pointer;
+  background:linear-gradient(155deg,#1a2620 0%,var(--panel2) 55%,#0f1815 100%);
+  border:1px solid var(--trace2); color:var(--flux);
+  padding:5px 11px; border-radius:4px; cursor:pointer;
   font-family:var(--cond); font-size:11px; font-weight:600;
   letter-spacing:.09em; text-transform:uppercase; white-space:nowrap;
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 -1px 0 rgba(0,0,0,.4) inset,
+    0 1px 2px rgba(0,0,0,.35);
+  transition:box-shadow .1s ease,transform .06s ease,background .12s,border-color .12s;
 }
-.btn:hover:not(:disabled){border-color:var(--pad);background:#18251f}
+.btn:hover:not(:disabled){border-color:var(--pad);background:linear-gradient(155deg,#1f2e26 0%,#18251f 55%,#101b17 100%)}
+.btn:active:not(:disabled){transform:translateY(1px);
+  box-shadow:0 1px 2px rgba(0,0,0,.5) inset}
 .btn:disabled{opacity:.4;cursor:not-allowed}
-.btn.go{background:var(--gold);border-color:var(--gold);color:#161206}
-.btn.go:hover:not(:disabled){background:#f0c368;border-color:#f0c368}
+/* the one real switch in the toolbar: this fires the build/flash */
+.btn.go{
+  background:radial-gradient(circle at 32% 26%,#fff6db 0%,#f6d488 16%,var(--gold) 55%,#a97a2a 100%);
+  border-color:#8a651f;color:#161206;
+  box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 -1.5px 2px rgba(0,0,0,.25) inset,
+    0 2px 4px rgba(0,0,0,.4),0 0 0 1px rgba(227,180,87,.25);
+}
+.btn.go:hover:not(:disabled){
+  background:radial-gradient(circle at 32% 26%,#fffaf0 0%,#f8dc9e 16%,#e8bf6c 55%,#a97a2a 100%);
+}
+.btn.go:active:not(:disabled){
+  transform:translateY(1px);
+  box-shadow:0 1px 3px rgba(0,0,0,.4) inset,0 0 0 1px rgba(227,180,87,.25);
+}
 .btn.danger:hover:not(:disabled){border-color:var(--hot);color:var(--hot)}
 .btn kbd{font-family:var(--mono);font-size:9px;opacity:.55;font-weight:400;
   letter-spacing:0}
@@ -123,7 +143,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- sidebar ---------- */
 #side{
-  grid-area:side; background:var(--panel); border-right:1px solid var(--trace);
+  grid-area:side; background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%); border-right:1px solid var(--trace);
   overflow-y:auto; display:flex; flex-direction:column;
 }
 .sect{border-bottom:1px solid var(--trace)}
@@ -161,7 +181,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 #main{grid-area:main;display:flex;flex-direction:column;min-width:0;
   background:var(--mask)}
 #tabs{
-  display:flex;align-items:stretch;background:var(--panel);
+  display:flex;align-items:stretch;background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);
   border-bottom:1px solid var(--trace);overflow-x:auto;flex:none;height:31px;
   scrollbar-width:none;
 }
@@ -283,7 +303,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- inspector ---------- */
 #insp{
-  grid-area:insp;background:var(--panel);border-left:1px solid var(--trace);
+  grid-area:insp;background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);border-left:1px solid var(--trace);
   display:flex;flex-direction:column;min-width:0;
 }
 #insptabs{display:flex;border-bottom:1px solid var(--trace);flex:none}
@@ -299,8 +319,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* pinout, the signature element */
 #board{
-  border:1px solid var(--trace2);border-radius:5px;background:#0C1614;
+  border:1px solid var(--trace2);border-radius:6px;
+  background:linear-gradient(160deg,#132420 0%,#0C1614 55%,#08110f 100%);
   padding:9px 0;position:relative;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset -1px -1px 0 rgba(0,0,0,.35);
 }
 #board .bname{text-align:center;margin-bottom:7px}
 #pins{display:grid;grid-template-columns:1fr auto 1fr;gap:0 8px;
@@ -317,10 +339,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 #pins .col.right .pin{flex-direction:row-reverse}
 .pin:hover{background:#17272120}
 .pin .pad{width:9px;height:9px;border:1.5px solid var(--pad);border-radius:2px;
-  flex:none;background:#0d1a15}
+  flex:none;background:#0d1a15;
+  box-shadow:inset 0 1px 1.5px rgba(0,0,0,.6),inset 0 -0.5px 0 rgba(255,255,255,.03)}
 .pin .n{min-width:30px}
 .pin.used{color:var(--gold)}
-.pin.used .pad{background:var(--gold);box-shadow:0 0 6px rgba(227,180,87,.55)}
+.pin.used .pad{
+  background:radial-gradient(circle at 30% 26%,#fff6db 0%,#f6d488 20%,var(--gold) 60%,#8a651f 100%);
+  box-shadow:inset 0.5px 0.5px 1px rgba(255,255,255,.7),0 0 6px rgba(227,180,87,.6)}
 .pin.warn .pad{border-color:var(--hot)}
 .pin.pwr{color:var(--hot)}
 .pin.pwr .pad{border-color:var(--hot);background:#1c100e}
@@ -392,7 +417,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* ---------- console ---------- */
 #console{
   flex:none;height:210px;display:flex;flex-direction:column;
-  border-top:1px solid var(--trace);background:var(--panel);min-height:26px;
+  border-top:1px solid var(--trace);background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);min-height:26px;
 }
 #drag{height:4px;cursor:row-resize;background:transparent;margin-top:-4px;
   position:relative;z-index:5}
@@ -458,7 +483,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- status ---------- */
 #status{
-  grid-area:status;background:var(--panel);border-top:1px solid var(--trace);
+  grid-area:status;background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);border-top:1px solid var(--trace);
   display:flex;align-items:center;gap:0;font-family:var(--mono);font-size:10.5px;
   color:var(--muted);padding:0;overflow:hidden;
 }
@@ -466,11 +491,15 @@ button,input,select,textarea{font:inherit;color:inherit}
   height:100%;display:flex;align-items:center;gap:6px;white-space:nowrap}
 #status .cell.grow{flex:1;border-right:none;overflow:hidden;
   text-overflow:ellipsis}
-#status .bar{width:52px;height:5px;background:#152420;border-radius:2px;
-  overflow:hidden;flex:none}
-#status .bar i{display:block;height:100%;background:var(--gold);width:0;
+#status .bar{width:52px;height:6px;background:#060907;border-radius:2px;
+  overflow:hidden;flex:none;
+  box-shadow:inset 0 1.5px 3px rgba(0,0,0,.85),inset 0 0 0 1px #000}
+#status .bar i{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,#8a651f,var(--gold));
+  box-shadow:0 0 4px rgba(227,180,87,.6);
   transition:width .3s}
-#status .bar i.hi{background:var(--hot)}
+#status .bar i.hi{background:linear-gradient(90deg,#8a2a18,var(--hot));
+  box-shadow:0 0 4px rgba(228,86,60,.6)}
 #status b{color:var(--flux);font-weight:500}
 #status .clickable{cursor:pointer}
 #status .clickable:hover{color:var(--gold)}
@@ -482,7 +511,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 #modal.on{display:grid}
 #mcard{
-  background:var(--panel);border:1px solid var(--trace2);border-radius:6px;
+  background:linear-gradient(165deg,#152520 0%,var(--panel) 45%,#0c1512 100%);border:1px solid var(--trace2);border-radius:6px;
   width:min(600px,100%);max-height:86vh;overflow-y:auto;
   box-shadow:0 26px 60px rgba(0,0,0,.65);
 }

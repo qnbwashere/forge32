@@ -42,9 +42,15 @@ links.
    Google Fonts link.
 6. **`app/server.js` is CommonJS and dependency free.** Do not convert it
    to ESM or add packages to it.
-7. **Do not touch `app/public/`.** That is the working IDE. Any redesign
-   work belongs only in `web/app/page.tsx`, `web/app/layout.tsx`, and
-   `web/app/globals.css`.
+7. **In `app/public/index.html`, the CSS can be restyled, the rest cannot.**
+   The IDE's visual language now matches the website: hardware panel,
+   chrome knobs, glowing LEDs, domed gold pads. Only the `<style>` block
+   (and small additive, non-functional touches) should change. Never
+   rename or remove an element `id`, never restructure the DOM the script
+   below relies on, and never touch `public/js/*.js` for a visual change.
+   Test in a browser after any edit here: open the sketch, type to trigger
+   autocomplete, switch console tabs, click a pin. All of it should still
+   work exactly as before, just look different.
 
 ## Running locally
 
