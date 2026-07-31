@@ -84,7 +84,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- the dial: a real control, not a decoration ---------- */
 .dials{display:flex; flex-direction:column; align-items:center; gap:18px;
-  padding:8px 0 22px; flex:none}
+  /* the radial menu's items need ~89px of clearance below the knob's
+     center to avoid clipping (see DIAL_R's comment); this sidebar sits
+     at the very bottom of the window (#side's default height is 940px),
+     so without real padding here the JS edge-clamp had to permanently
+     shift the whole menu upward off the knob's true center just to fit --
+     which read as "the ring isn't centered on the dial". */
+  padding:8px 0 46px; flex:none}
 .dial{display:flex;flex-direction:column;align-items:center;gap:9px;position:relative}
 .oled{
   font-family:var(--mono); font-size:9px; letter-spacing:.14em;
@@ -125,14 +131,27 @@ button,input,select,textarea{font:inherit;color:inherit}
    a light looping around it forever -- the ring only lights up for
    something actually happening (compiling, uploading, done, error). */
 .knob[data-state="idle"] .ring-fg{opacity:0}
-/* busy (compiling): an indeterminate arc sweeping around the ring */
-@keyframes dial-sweep{to{transform:rotate(360deg)}}
+/* busy (compiling): an indeterminate arc sweeping around the ring.
+   The keyframe must land on 270deg, not 360 -- .ring's own base transform
+   is rotate(-90deg) (-90 mod 360 = 270), so ending the loop anywhere else
+   made it snap backward every 1.1s instead of spinning smoothly. */
+@keyframes dial-sweep{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}
 .knob[data-state="busy"] .ring{animation:dial-sweep 1.1s linear infinite}
 .knob[data-state="busy"] .ring-fg{stroke-dashoffset:210;opacity:1}
-/* uploading: fills up around the knob as it goes */
+/* uploading: fills up around the knob as it goes, with a bright head
+   riding the leading edge of the fill -- the same "a light going around
+   it" idea as the busy sweep, but tracking real progress instead of
+   spinning blind. Position is set in JS (setDial) since an arbitrary
+   point on a circle isn't expressible in CSS alone. */
 .knob[data-state="upload"] .ring-fg{
   opacity:1; stroke-dashoffset:calc(283 - 283 * var(--fill,0));
 }
+.ring-tip{
+  fill:var(--gold); opacity:0;
+  filter:drop-shadow(0 0 3px rgba(199,227,110,.95)) drop-shadow(0 0 7px rgba(199,227,110,.6));
+  transition:opacity .2s, cx .3s ease, cy .3s ease;
+}
+.knob[data-state="upload"] .ring-tip{opacity:1}
 /* done: a brief full green ring before it settles back to idle */
 .knob[data-state="ok"] .ring-fg{
   stroke:var(--ok); stroke-dashoffset:0; opacity:1;
@@ -257,7 +276,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* ---------- sidebar ---------- */
 #side{
   background:linear-gradient(165deg,#212327 0%,#1a1c20 45%,#141517 100%);
-  overflow-y:auto; display:flex; flex-direction:column;
+  /* overflow-x must stay hidden, not the auto default -- leaving it unset
+     makes it compute to 'auto' (since overflow-y isn't 'visible'), and the
+     busy-dial's rotating ring's bounding box briefly exceeds the sidebar's
+     width mid-spin, flickering a horizontal scrollbar in and out and
+     shoving the whole sidebar sideways every animation loop. */
+  overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column;
 }
 /* One continuous nav panel: sections are told apart by a label and
    generous spacing, not by drawing a box around each of them. */
@@ -543,6 +567,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 @keyframes pindoc-pop{0%{opacity:.4;transform:translateY(4px)}100%{opacity:1;transform:translateY(0)}}
 #pindoc h4{margin:0 0 4px;font-family:var(--mono);font-size:12px;
   color:var(--flux);font-weight:600}
+.pu-hint{margin:0 0 6px;font-size:11.5px;color:var(--flux);font-style:italic}
 .pinuse{margin:2px 0 7px;padding:6px 8px;border-radius:var(--r-sm);
   background:rgba(199,227,110,.06)}
 .pu-row{font-family:var(--mono);font-size:10.5px;color:var(--muted);
@@ -865,6 +890,7 @@ button,input,select,textarea{font:inherit;color:inherit}
           <svg class="ring" viewBox="0 0 100 100">
             <circle class="ring-track" cx="50" cy="50" r="45"></circle>
             <circle class="ring-fg" cx="50" cy="50" r="45"></circle>
+            <circle class="ring-tip" cx="95" cy="50" r="3.2"></circle>
           </svg>
           <span class="knobface"><span class="knobmark"></span></span>
         </button>
@@ -2802,8 +2828,13 @@ async function aiGhost() {
   if (aiPending) return;
   if (!aiKey && !AI_HOSTED) return toast('Add an API key in Setup to use model suggestions', 'bad');
   const pos = ta.selectionStart;
-  const before = ta.value.slice(Math.max(0, pos - 1400), pos);
-  const after = ta.value.slice(pos, pos + 400);
+  // 1400 chars of lookback was cutting off functions/#defines declared
+  // earlier in anything but a short file, so the model had no idea they
+  // existed and kept re-declaring or guessing names instead of reusing
+  // them. Send the whole file up to a generous cap instead.
+  const full = ta.value;
+  const before = full.slice(Math.max(0, pos - 6000), pos);
+  const after = full.slice(pos, pos + 400);
   const key = before.slice(-160);
   if (aiCache.has(key)) return paintGhost('', aiCache.get(key), pos);
   aiPending = true;
@@ -2815,16 +2846,18 @@ async function aiGhost() {
       headers['anthropic-version'] = '2023-06-01';
       headers['anthropic-dangerous-direct-browser-access'] = 'true';
     }
+    const fqbn = (typeof SET !== 'undefined' && SET.fqbn) || 'esp32:esp32:esp32';
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers,
       body: JSON.stringify({
         model: 'claude-sonnet-4-6', max_tokens: 1000,
         messages: [{
           role: 'user',
-          content: 'You are completing Arduino C++ code for an ESP32 (arduino-esp32 core 3.x). ' +
-            'Continue from the caret marked <CARET>. Reply with the continuation text only: ' +
-            'no explanation, no markdown fences, no repeat of the text before the caret. ' +
-            'Keep it to at most 6 lines and match the surrounding indentation.\n\n' +
+          content: 'You are completing Arduino C++ code for a ' + fqbn + ' board (arduino-esp32 core 3.x). ' +
+            'Continue from the caret marked <CARET>. Reuse the exact names of any functions, #defines, ' +
+            'and variables already declared above rather than inventing new ones or re-declaring them. ' +
+            'Reply with the continuation text only: no explanation, no markdown fences, no repeat of the ' +
+            'text before the caret. Keep it to at most 6 lines and match the surrounding indentation.\n\n' +
             '```cpp\n' + before + '<CARET>' + after + '\n```',
         }],
       }),
@@ -4203,6 +4236,7 @@ function showPin(n, animate) {
   const p = PINS.pins.find(x => x.n === n);
   if (!p) return;
   const uses = (St.usedPins && St.usedPins.get(n)) || [];
+  const hint = St.pinHints && St.pinHints.get(n);
   const doc = $('#pindoc');
   let usageHtml = '';
   if (uses.length) {
@@ -4211,7 +4245,8 @@ function showPin(n, animate) {
       const key = (u.fn || 'top level') + '|' + u.role;
       if (!seen.has(key)) seen.set(key, u.line);
     }
-    usageHtml = '<div class="pinuse">' + [...seen].map(([key, line]) => {
+    usageHtml = (hint ? '<p class="pu-hint">' + esc(hint) + '.</p>' : '') +
+      '<div class="pinuse">' + [...seen].map(([key, line]) => {
       const [fn, role] = key.split('|');
       return '<div class="pu-row"><b>' + esc(fn) + '()</b> ' + esc(role) +
         ' <span class="pu-line" data-line="' + line + '">line ' + line + '</span></div>';
@@ -4232,17 +4267,67 @@ function showPin(n, animate) {
   }
 }
 
+/* Role text for calls whose meaning doesn't change with their arguments --
+   the ones that do (pinMode's mode, digitalWrite's level, analogWrite's
+   duty) are worked out per call site in roleFor() below instead, so e.g.
+   two digitalWrite() calls in the same loop() read as "driven HIGH" and
+   "driven LOW" instead of both collapsing into one vague "driven high or
+   low" line. */
 const PIN_ROLE = {
-  pinMode: 'configured', digitalWrite: 'driven high or low', digitalRead: 'read as a digital input',
+  digitalRead: 'read as a digital input',
   analogRead: 'read on the ADC', analogReadMilliVolts: 'read on the ADC',
-  analogWrite: 'driven with PWM', touchRead: 'read as capacitive touch',
-  dacWrite: 'driven with the DAC', ledcAttach: 'driven with PWM', ledcWrite: 'driven with PWM',
+  touchRead: 'read as capacitive touch',
+  dacWrite: 'driven with the DAC', ledcAttach: 'driven with PWM',
   ledcDetach: 'detached from PWM', attachInterrupt: 'watched for interrupts',
   detachInterrupt: 'detached from interrupts', pulseIn: 'timed for incoming pulses',
   tone: 'driven with a tone', noTone: 'stopped from tone output',
   touchAttachInterrupt: 'watched for a touch interrupt',
   digitalPinToInterrupt: 'mapped for an interrupt', esp_sleep_enable_ext0_wakeup: 'used as a wake source',
 };
+/* fn name -> the arg index (after the pin) whose literal value changes
+   what the role text should say */
+function roleFor(fn, arg) {
+  arg = (arg || '').trim();
+  if (fn === 'pinMode') {
+    if (/^INPUT_PULLUP$/.test(arg)) return 'configured as an input with the internal pull-up enabled';
+    if (/^INPUT_PULLDOWN$/.test(arg)) return 'configured as an input with the internal pull-down enabled';
+    if (/^INPUT$/.test(arg)) return 'configured as a plain input';
+    if (/^OUTPUT$/.test(arg)) return 'configured as an output';
+    return arg ? 'configured (mode: ' + arg + ')' : 'configured';
+  }
+  if (fn === 'digitalWrite') {
+    if (/^(HIGH|1|true)$/i.test(arg)) return 'driven HIGH';
+    if (/^(LOW|0|false)$/i.test(arg)) return 'driven LOW';
+    return arg ? 'driven high or low depending on ' + arg : 'driven high or low';
+  }
+  if (fn === 'analogWrite' || fn === 'ledcWrite') {
+    if (/^\d+$/.test(arg)) return 'driven with PWM at a fixed duty of ' + arg;
+    return arg ? 'driven with a variable PWM duty (' + arg + ')' : 'driven with PWM';
+  }
+  return PIN_ROLE[fn] || 'used';
+}
+/* a handful of common pin-naming conventions -- when a sketch names its
+   pin constant LED_PIN or BTN_RELAY etc., that name is a much stronger
+   signal of real-world intent than "GPIO2 was passed to digitalWrite",
+   so surface it instead of leaving the reader to guess from raw API calls */
+const NAME_HINTS = [
+  [/led/i, 'looks like it drives an LED, based on its name'],
+  [/(button|btn)/i, 'looks like it reads a button, based on its name'],
+  [/relay/i, 'looks like it drives a relay, based on its name'],
+  [/servo/i, 'looks like it drives a servo, based on its name'],
+  [/motor/i, 'looks like it drives a motor, based on its name'],
+  [/(buzzer|piezo|speaker)/i, 'looks like it drives a buzzer, based on its name'],
+  [/(pir|motion|pir_?sensor)/i, 'looks like a PIR motion sensor, based on its name'],
+  [/trig/i, 'looks like an ultrasonic sensor’s trigger pin, based on its name'],
+  [/echo/i, 'looks like an ultrasonic sensor’s echo pin, based on its name'],
+  [/(dht|temp|humid)/i, 'looks like a temperature/humidity sensor, based on its name'],
+  [/(sda)/i, 'looks like an I2C data line, based on its name'],
+  [/(scl)/i, 'looks like an I2C clock line, based on its name'],
+];
+function hintFor(name) {
+  const hit = NAME_HINTS.find(([re]) => re.test(name));
+  return hit ? hit[1] : null;
+}
 
 /* find what actually happens to each GPIO by reading the sketch, not just
    whether it appears in it -- this is what drives the "used in this
@@ -4254,6 +4339,7 @@ function updatePinUse() {
   for (const m of src.matchAll(/\b(?:const\s+)?(?:int|uint8_t|byte|gpio_num_t)\s+(\w+)\s*=\s*(?:GPIO_NUM_)?(\d+)/g))
     consts[m[1]] = +m[2];
   const used = new Map();
+  const hints = new Map();
   const lineOf = idx => (src.slice(0, idx).match(/\n/g) || []).length + 1;
   const funcAt = idx => {
     const before = src.slice(0, idx);
@@ -4272,9 +4358,13 @@ function updatePinUse() {
     if (!Number.isInteger(n) || n < 0 || n > 48) return;
     if (!used.has(n)) used.set(n, []);
     used.get(n).push({ role, line: lineOf(idx), fn: funcAt(idx) || 'top level' });
+    if (!/^\d+$/.test(v) && !hints.has(n)) {
+      const h = hintFor(v);
+      if (h) hints.set(n, h);
+    }
   };
-  const single = /\b(pinMode|digitalWrite|digitalRead|analogRead|analogReadMilliVolts|analogWrite|touchRead|dacWrite|ledcAttach|ledcWrite|ledcDetach|attachInterrupt|detachInterrupt|pulseIn|tone|noTone|touchAttachInterrupt|digitalPinToInterrupt|esp_sleep_enable_ext0_wakeup)\s*\(\s*([A-Za-z_]\w*|\d+|GPIO_NUM_\d+)/g;
-  for (const m of src.matchAll(single)) record(m[2], m.index, PIN_ROLE[m[1]] || 'used');
+  const single = /\b(pinMode|digitalWrite|digitalRead|analogRead|analogReadMilliVolts|analogWrite|touchRead|dacWrite|ledcAttach|ledcWrite|ledcDetach|attachInterrupt|detachInterrupt|pulseIn|tone|noTone|touchAttachInterrupt|digitalPinToInterrupt|esp_sleep_enable_ext0_wakeup)\s*\(\s*([A-Za-z_]\w*|\d+|GPIO_NUM_\d+)\s*(?:,\s*([^,)]+))?/g;
+  for (const m of src.matchAll(single)) record(m[2], m.index, roleFor(m[1], m[3]));
   for (const m of src.matchAll(/\.attach\s*\(\s*([A-Za-z_]\w*|\d+)/g)) record(m[1], m.index, 'driven with PWM');
   for (const m of src.matchAll(/Wire1?\.(?:begin|setPins)\s*\(([^)]*)\)/g)) {
     const labels = ['the I2C data line (SDA)', 'the I2C clock line (SCL)'];
@@ -4287,6 +4377,7 @@ function updatePinUse() {
   for (const m of src.matchAll(/Adafruit_NeoPixel\s*\w*\s*\(\s*[^,]+,\s*([A-Za-z_]\w*|\d+)/g))
     record(m[1], m.index, 'driving a NeoPixel strip');
   St.usedPins = used;
+  St.pinHints = hints;
   $$('#pins .pin').forEach(el =>
     el.classList.toggle('used', used.has(+el.dataset.p)));
   if (St.selectedPin != null && used.has(St.selectedPin)) showPin(St.selectedPin);
@@ -4393,7 +4484,18 @@ function setDial(state, label, opts) {
   oled.classList.toggle('mode-error', state === 'error');
   oled.classList.toggle('mode-ok', state === 'ok');
   if (label) oled.textContent = label;
-  if (opts && typeof opts.fill === 'number') knob.style.setProperty('--fill', String(opts.fill));
+  if (opts && typeof opts.fill === 'number') {
+    knob.style.setProperty('--fill', String(opts.fill));
+    const tip = knob.querySelector('.ring-tip');
+    if (tip) {
+      // ring-fg's stroke starts drawing at local angle 0 (unrotated point
+      // (95,50)) and reveals clockwise as --fill grows, same convention
+      // stroke-dashoffset uses -- so the tip rides that same local angle.
+      const a = opts.fill * 2 * Math.PI;
+      tip.setAttribute('cx', (50 + 45 * Math.cos(a)).toFixed(1));
+      tip.setAttribute('cy', (50 + 45 * Math.sin(a)).toFixed(1));
+    }
+  }
   if (opts && opts.revertAfter) {
     dialRevertT = setTimeout(() => {
       knob.dataset.state = 'idle';
@@ -4454,7 +4556,11 @@ function openDialMenu() {
   // anchor away from dead center on the knob only in the rare case where
   // the knob itself is close enough to a window edge that it has to --
   // a few px off-center beats items getting clipped off the window.
-  const clear = DIAL_R + 30;
+  // The 89px item radius below is the real worst case for a 56x34 dm-item
+  // sitting at DIAL_R=70 (70 + 17 half-height + 2px margin) -- not a rough
+  // guess -- so this only ever engages when a window genuinely can't fit
+  // the ring, instead of nudging it on every normal-sized window.
+  const clear = DIAL_R + 19;
   cx = Math.min(Math.max(cx, clear), innerWidth - clear);
   cy = Math.min(Math.max(cy, clear), innerHeight - clear);
   const menu = $('#dial-menu');
