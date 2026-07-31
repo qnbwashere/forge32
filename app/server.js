@@ -501,6 +501,40 @@ const api = {
     return { ok: true, name: clean };
   },
 
+  // Individual files within a sketch, distinct from the sketch itself --
+  // the primary .ino is off limits here since its name is locked to the
+  // sketch's own name (rename the sketch to change it).
+  async 'POST /api/sketch/file/rename'(body) {
+    const sketchName = String(body.name || '');
+    const dir = safeSketchPath(sketchName);
+    const oldFile = path.basename(String(body.file || ''));
+    const newFile = path.basename(String(body.newFile || '').trim());
+    const mainName = (sketchName + '.ino').toLowerCase();
+    if (oldFile.toLowerCase() === mainName) throw new Error('Rename the sketch itself to change its main file.');
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(ino|h|hpp|c|cpp)$/i.test(newFile)) throw new Error('Use an .ino, .h, .hpp, .c or .cpp name.');
+    if (newFile.toLowerCase() === mainName) throw new Error('That name is reserved for the sketch\'s main file.');
+    const oldPath = path.join(dir, oldFile);
+    const newPath = path.join(dir, newFile);
+    safeSketchPath(path.relative(SKETCHBOOK, newPath));
+    if (oldFile.toLowerCase() === newFile.toLowerCase()) return { ok: true, file: newFile };
+    const clash = await fsp.access(newPath).then(() => true, () => false);
+    if (clash) throw new Error('A file named "' + newFile + '" already exists.');
+    await fsp.rename(oldPath, newPath);
+    return { ok: true, file: newFile };
+  },
+
+  async 'POST /api/sketch/file/delete'(body) {
+    const sketchName = String(body.name || '');
+    const dir = safeSketchPath(sketchName);
+    const file = path.basename(String(body.file || ''));
+    if (file.toLowerCase() === (sketchName + '.ino').toLowerCase())
+      throw new Error('Cannot delete the sketch\'s main file. Delete the sketch instead.');
+    const full = path.join(dir, file);
+    safeSketchPath(path.relative(SKETCHBOOK, full));
+    await fsp.rm(full, { force: true });
+    return { ok: true };
+  },
+
   async 'GET /api/libraries'(q) {
     const query = (q.get('q') || '').trim();
     if (!CLI) {
