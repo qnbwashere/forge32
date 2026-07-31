@@ -11,6 +11,7 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
+const crypto = require('node:crypto');
 const { spawn, execFile } = require('node:child_process');
 
 const PORT = Number(process.env.FORGE32_PORT || 4032);
@@ -368,6 +369,129 @@ function stopAllMonitors() {
   return ports;
 }
 
+/* ------------------------------------------------------------------ */
+/* Ask AI -- shells out to a locally installed, already-authenticated   */
+/* coding CLI (Claude Code or Codex) instead of ever holding an API key. */
+/* ------------------------------------------------------------------ */
+
+const SKETCH_FILE_RE = /\.(ino|h|hpp|c|cpp)$/i;
+const aiSessions = new Map(); // sessionId -> { dir, sketchName, changedFiles, createdAt }
+
+/* shell:true so a bare command name resolves through PATH the same way a
+   terminal would, including npm's .cmd shims on Windows -- execFile alone
+   doesn't reliably find those. */
+function commandExists(cmd) {
+  return new Promise((resolve) => {
+    execFile(cmd, ['--version'], { timeout: 5000, shell: true }, (err) => resolve(!err));
+  });
+}
+
+/* Old AI sessions (abandoned tabs, crashed renderers) would otherwise leak
+   temp directories forever since nothing calls apply/discard for them. */
+function sweepAiSessions() {
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  for (const [id, sess] of aiSessions) {
+    if (sess.createdAt < cutoff) {
+      fsp.rm(sess.dir, { recursive: true, force: true }).catch(() => {});
+      aiSessions.delete(id);
+    }
+  }
+}
+setInterval(sweepAiSessions, 5 * 60 * 1000).unref();
+
+async function handleAiEdit(body, stm) {
+  const sketchName = String(body.name || '');
+  const instruction = String(body.instruction || '').trim();
+  const provider = body.provider === 'codex' ? 'codex' : 'claude';
+  const bin = provider === 'codex' ? 'codex' : 'claude';
+  if (!sketchName) return stm.end({ t: 'err', line: 'No sketch open.', fatal: true });
+  if (!instruction) return stm.end({ t: 'err', line: 'Describe what you want changed first.', fatal: true });
+
+  if (!(await commandExists(bin))) {
+    stm.send({ t: 'err', line: (provider === 'codex' ? 'Codex' : 'Claude Code') +
+      ' CLI was not found on your PATH. Install it and sign in, then try again.' });
+    return stm.end({ t: 'done', ok: false });
+  }
+
+  const realDir = safeSketchPath(sketchName);
+  let tmpDir;
+  try { tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'forge32-ai-')); }
+  catch (e) { return stm.end({ t: 'err', line: 'Could not create a working copy: ' + e.message, fatal: true }); }
+
+  // Snapshot the real sketch, then lay the caller's in-editor (possibly
+  // unsaved) file contents on top, so the CLI sees exactly what's in the
+  // editor right now rather than stale disk state.
+  const before = {};
+  const entries = await fsp.readdir(realDir, { withFileTypes: true }).catch(() => []);
+  for (const e of entries) {
+    if (!e.isFile() || !SKETCH_FILE_RE.test(e.name)) continue;
+    const content = await fsp.readFile(path.join(realDir, e.name), 'utf8');
+    before[e.name] = content;
+    await fsp.writeFile(path.join(tmpDir, e.name), content, 'utf8');
+  }
+  for (const [file, content] of Object.entries(body.files || {})) {
+    const base = path.basename(file);
+    if (!SKETCH_FILE_RE.test(base)) continue;
+    before[base] = String(content ?? '');
+    await fsp.writeFile(path.join(tmpDir, base), String(content ?? ''), 'utf8');
+  }
+
+  stm.send({ t: 'note', line: 'Starting ' + (provider === 'codex' ? 'Codex' : 'Claude Code') + '…' });
+  // Both run headless, non-interactively, and are free to edit anything --
+  // that's only ever safe because tmpDir is a throwaway copy nothing real
+  // touches; the actual sketch on disk isn't modified until Apply.
+  const args = provider === 'codex'
+    ? ['exec', '--full-auto', '--skip-git-repo-check', instruction]
+    : ['-p', instruction, '--permission-mode', 'acceptEdits'];
+
+  const code = await new Promise((resolve) => {
+    let child;
+    try { child = spawn(bin, args, { cwd: tmpDir, env: process.env, shell: true }); }
+    catch (e) { stm.send({ t: 'err', line: 'Could not start ' + bin + ': ' + e.message }); return resolve(-1); }
+    const timer = setTimeout(() => { try { child.kill(); } catch {} }, 8 * 60 * 1000);
+    const tail = { out: '', err: '' };
+    const pump = (chunk, kind) => {
+      tail[kind] += chunk;
+      const parts = tail[kind].split(/\r?\n/);
+      tail[kind] = parts.pop();
+      for (const line of parts) if (line.trim()) stm.send({ t: kind, line });
+    };
+    child.stdout.on('data', (d) => pump(String(d), 'out'));
+    child.stderr.on('data', (d) => pump(String(d), 'err'));
+    child.on('error', (e) => { clearTimeout(timer); stm.send({ t: 'err', line: 'Could not start ' + bin + ': ' + e.message }); resolve(-1); });
+    child.on('close', (c) => {
+      clearTimeout(timer);
+      for (const kind of ['out', 'err']) if (tail[kind].trim()) stm.send({ t: kind, line: tail[kind] });
+      resolve(c);
+    });
+  });
+
+  const afterEntries = await fsp.readdir(tmpDir, { withFileTypes: true }).catch(() => []);
+  const changes = [];
+  const seen = new Set();
+  for (const e of afterEntries) {
+    if (!e.isFile() || !SKETCH_FILE_RE.test(e.name)) continue;
+    seen.add(e.name);
+    const after = await fsp.readFile(path.join(tmpDir, e.name), 'utf8');
+    if (after !== (before[e.name] ?? '')) changes.push({ file: e.name, before: before[e.name] ?? '', after });
+  }
+  for (const name of Object.keys(before)) {
+    if (!seen.has(name)) changes.push({ file: name, before: before[name], after: '' });
+  }
+
+  if (!changes.length) {
+    await fsp.rm(tmpDir, { recursive: true, force: true });
+    stm.send({ t: 'note', line: code === 0 ? 'It finished without changing any files.' : 'Exited without changing any files.' });
+    return stm.end({ t: 'done', ok: code === 0, changes: [] });
+  }
+
+  const sessionId = crypto.randomBytes(8).toString('hex');
+  aiSessions.set(sessionId, {
+    dir: tmpDir, sketchName, changedFiles: changes.map((c) => c.file), createdAt: Date.now(),
+  });
+  stm.end({ t: 'done', ok: true, sessionId, changes });
+}
+
 const api = {
 
   async 'GET /api/status'() {
@@ -600,6 +724,37 @@ const api = {
     }));
     return { ok: true, options };
   },
+
+  async 'GET /api/ai/providers'() {
+    const [claude, codex] = await Promise.all([commandExists('claude'), commandExists('codex')]);
+    return { ok: true, claude, codex };
+  },
+
+  async 'POST /api/ai/apply'(body) {
+    const sess = aiSessions.get(String(body.sessionId || ''));
+    if (!sess) return { ok: false, error: 'That AI session has expired. Ask again.' };
+    const realDir = safeSketchPath(sess.sketchName);
+    for (const file of sess.changedFiles) {
+      const tmpFile = path.join(sess.dir, file);
+      const realFile = path.join(realDir, file);
+      safeSketchPath(path.relative(SKETCHBOOK, realFile));
+      const stillExists = await fsp.access(tmpFile).then(() => true, () => false);
+      if (stillExists) await fsp.copyFile(tmpFile, realFile);
+      else await fsp.rm(realFile, { force: true });
+    }
+    await fsp.rm(sess.dir, { recursive: true, force: true });
+    aiSessions.delete(String(body.sessionId));
+    return { ok: true };
+  },
+
+  async 'POST /api/ai/discard'(body) {
+    const sess = aiSessions.get(String(body.sessionId || ''));
+    if (sess) {
+      await fsp.rm(sess.dir, { recursive: true, force: true });
+      aiSessions.delete(String(body.sessionId));
+    }
+    return { ok: true };
+  },
 };
 
 function describeBridge(vid, pid) {
@@ -782,6 +937,7 @@ const streamRoutes = {
   'POST /api/setup': (body, stm) => handleSetup(body, stm),
   'POST /api/compile': (body, stm) => handleCompile(body, stm, { upload: false }),
   'POST /api/upload': (body, stm) => handleCompile(body, stm, { upload: true }),
+  'POST /api/ai/edit': (body, stm) => handleAiEdit(body, stm),
   'POST /api/monitor': (body, stm, res) => handleMonitor(body, stm, res),
   'POST /api/lib/install': async (body, stm) => {
     const name = String(body.name || '');
