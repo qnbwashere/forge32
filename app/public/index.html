@@ -768,6 +768,14 @@ button,input,select,textarea{font:inherit;color:inherit}
   letter-spacing:.1em;text-transform:uppercase;padding-top:2px}
 .state.ok{color:var(--ok)} .state.bad{color:var(--hot)}
 .state.run{color:var(--gold)} .state.idle{color:var(--dim)}
+/* Ask AI's review-before-apply diff */
+.ai-diff{max-height:360px;overflow-y:auto;border-radius:var(--r-sm);
+  background:var(--mask);padding:8px 0;font-family:var(--mono);font-size:11px;line-height:1.6}
+.ai-diff>div{padding:0 12px;white-space:pre-wrap;word-break:break-all}
+.ai-add{background:rgba(70,201,139,.12);color:#8fe3bd}
+.ai-del{background:rgba(228,86,60,.12);color:#f0a595;text-decoration:line-through;text-decoration-color:rgba(240,165,149,.5)}
+.ai-ctx{color:var(--dim)}
+.ai-skip{color:var(--dim);text-align:center;padding:2px 0!important;opacity:.6}
 #toast{
   position:fixed;bottom:36px;left:50%;transform:translateX(-50%) translateY(14px) scale(.96);
   background:#16181b;border:1px solid var(--hair2);border-radius:var(--r-sm);
@@ -2888,6 +2896,169 @@ function paintGhostMulti(g, pos) {
     esc(r || ' ') + '</i></div>').join('');
 }
 
+/* ---------------- Ask AI: describe a change, review a diff, apply it ----------------
+   Separate from aiGhost() above (which only ever appends a short inline
+   prediction) -- this sends the whole file plus a free-form instruction and
+   gets a whole rewritten file back, so it needs its own key, its own model
+   picker (Claude or OpenAI, BYOK, direct from the browser same as aiGhost),
+   and -- since a model can rewrite far more than it was asked to -- a diff
+   the user reviews before anything touches the real file. */
+let openaiKey = '', aiEditProvider = 'claude';
+let aiEditPending = false, aiEditResult = null;
+
+function diffLines(oldStr, newStr) {
+  const a = oldStr.split('\n'), b = newStr.split('\n');
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const ops = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) { ops.push({ t: 'ctx', line: a[i] }); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { ops.push({ t: 'del', line: a[i] }); i++; }
+    else { ops.push({ t: 'add', line: b[j] }); j++; }
+  }
+  while (i < n) { ops.push({ t: 'del', line: a[i] }); i++; }
+  while (j < m) { ops.push({ t: 'add', line: b[j] }); j++; }
+  return ops;
+}
+
+/* long unchanged runs get collapsed to a few lines of context either side --
+   a full-file rewrite that only touched one function shouldn't force the
+   reader to scroll past 200 identical lines to find what changed */
+function renderDiffHtml(ops) {
+  const CTX = 3;
+  const keep = new Array(ops.length).fill(false);
+  ops.forEach((op, i) => {
+    if (op.t !== 'ctx') {
+      for (let k = Math.max(0, i - CTX); k <= Math.min(ops.length - 1, i + CTX); k++) keep[k] = true;
+    }
+  });
+  let html = '', skipping = false;
+  ops.forEach((op, i) => {
+    if (!keep[i]) {
+      if (!skipping) { html += '<div class="ai-skip">⋯</div>'; skipping = true; }
+      return;
+    }
+    skipping = false;
+    const cls = op.t === 'add' ? 'ai-add' : op.t === 'del' ? 'ai-del' : 'ai-ctx';
+    const mark = op.t === 'add' ? '+' : op.t === 'del' ? '-' : ' ';
+    html += '<div class="' + cls + '">' + mark + ' ' + esc(op.line) + '</div>';
+  });
+  return html || '<div class="ai-ctx">No changes.</div>';
+}
+
+function openAiPrompt() {
+  if (!St.sketch) return toast('Open a sketch first', 'bad');
+  const hasClaude = !!aiKey, hasOpenAI = !!openaiKey;
+  if (!hasClaude && !hasOpenAI && !AI_HOSTED) {
+    return toast('Add a Claude or OpenAI key in Setup to use Ask AI', 'bad');
+  }
+  modal('Ask AI', `
+    <p style="margin-bottom:8px">Describe what you want changed in <b>${esc(St.active || '')}</b>.
+    The model sees the whole file and proposes a full rewrite -- you'll get a diff to review before
+    anything is applied.</p>
+    <textarea id="ai-prompt" rows="3" placeholder="e.g. add a debounce to the button read, or explain what loop() does"
+      style="width:100%;resize:vertical;background:var(--mask);border:1px solid var(--trace2);
+      border-radius:3px;padding:7px 9px;font-family:var(--sans);font-size:12.5px;color:var(--flux)"></textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <select id="ai-provider" style="background:var(--mask);border:1px solid var(--trace2);
+        border-radius:3px;padding:5px 7px;font-family:var(--sans);font-size:11.5px;color:var(--flux)">
+        <option value="claude"${aiEditProvider === 'claude' ? ' selected' : ''}${hasClaude || AI_HOSTED ? '' : ' disabled'}>Claude</option>
+        <option value="openai"${aiEditProvider === 'openai' ? ' selected' : ''}${hasOpenAI ? '' : ' disabled'}>OpenAI (Codex)</option>
+      </select>
+      <span class="hint" style="padding:0">No key? Add one in Setup first.</span>
+    </div>`,
+    '<button class="btn" data-close>Cancel</button>' +
+    '<button class="btn go" id="ai-go">Generate</button>');
+  $('#ai-provider').onchange = (e) => { aiEditProvider = e.target.value; };
+  $('#ai-go').onclick = runAiPrompt;
+  setTimeout(() => $('#ai-prompt').focus(), 10);
+}
+
+async function runAiPrompt() {
+  const instruction = ($('#ai-prompt').value || '').trim();
+  if (!instruction) return toast('Describe what you want changed first', 'bad');
+  if (aiEditPending) return;
+  aiEditPending = true;
+  const goBtn = $('#ai-go');
+  if (goBtn) { goBtn.textContent = 'Thinking…'; goBtn.disabled = true; }
+  const original = ta.value;
+  const fqbn = (typeof SET !== 'undefined' && SET.fqbn) || 'esp32:esp32:esp32';
+  const sys = 'You are editing "' + St.active + '", an Arduino C++ file for a ' + fqbn +
+    ' board (arduino-esp32 core 3.x), inside the FORGE32 IDE. Apply the user\'s requested change ' +
+    'to the file below and reply with ONLY the complete resulting file, start to finish -- no ' +
+    'markdown fences, no explanation, no commentary. Keep everything the user did not ask to change ' +
+    'exactly as it was. If the request can\'t be done or is unclear, reply with exactly: ERROR: <short reason>';
+  const userMsg = 'Requested change: ' + instruction + '\n\nCurrent file:\n```cpp\n' +
+    original.slice(0, 20000) + '\n```';
+  try {
+    let out;
+    if (aiEditProvider === 'openai') {
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + openaiKey },
+        body: JSON.stringify({
+          model: 'gpt-5-codex',
+          messages: [{ role: 'system', content: sys }, { role: 'user', content: userMsg }],
+        }),
+      });
+      const data = await r.json();
+      if (data.error) throw new Error(data.error.message || 'OpenAI request failed');
+      out = (data.choices && data.choices[0] && data.choices[0].message.content) || '';
+    } else {
+      const headers = { 'Content-Type': 'application/json' };
+      if (aiKey) {
+        headers['x-api-key'] = aiKey;
+        headers['anthropic-version'] = '2023-06-01';
+        headers['anthropic-dangerous-direct-browser-access'] = 'true';
+      }
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6', max_tokens: 8000,
+          system: sys,
+          messages: [{ role: 'user', content: userMsg }],
+        }),
+      });
+      const data = await r.json();
+      if (data.error) throw new Error(data.error.message || 'Claude request failed');
+      out = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    }
+    out = out.replace(/^```[a-z+]*\n?/i, '').replace(/```\s*$/, '').trim();
+    if (/^ERROR:/i.test(out)) throw new Error(out.replace(/^ERROR:\s*/i, ''));
+    if (!out) throw new Error('Empty response');
+    aiEditResult = out;
+    const ops = diffLines(original, out);
+    modal('Review AI change', `
+      <p style="margin-bottom:8px">Changes to <b>${esc(St.active || '')}</b>:</p>
+      <div class="ai-diff">${renderDiffHtml(ops)}</div>`,
+      '<button class="btn" data-close>Discard</button>' +
+      '<button class="btn go" id="ai-apply">Apply</button>');
+    $('#ai-apply').onclick = () => { applyAiEdit(aiEditResult); closeModal(); };
+  } catch (e) {
+    toast('Ask AI failed: ' + e.message, 'bad');
+  } finally {
+    aiEditPending = false;
+  }
+}
+
+function applyAiEdit(newContent) {
+  ta.focus();
+  ta.select();
+  const applied = document.execCommand('insertText', false, newContent);
+  if (!applied) ta.value = newContent; // execCommand can be unavailable outside a real user gesture
+  St.files[St.active] = newContent;
+  scanDocument();
+  render();
+  updateOutline();
+  updatePinUse();
+  markDirty();
+  toast('AI change applied', 'good');
+}
+
 /* ---------------- typing behaviour ---------------- */
 const PAIRS = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'" };
 const CLOSERS = new Set([')', ']', '}', '"', "'"]);
@@ -3358,9 +3529,13 @@ function openSetup() {
     <div style="margin-top:14px;border-top:1px solid var(--trace);padding-top:12px">
       <div class="silk" style="margin-bottom:6px">Model suggestions</div>
       <p style="margin-bottom:8px">Optional. With a key, Ctrl+Shift+P asks a
-      model for a longer continuation. The key stays in this tab and is never
-      written to disk.</p>
-      <input id="aikey" type="password" placeholder="sk-ant-..." style="width:100%;
+      model for a longer continuation, and Ctrl+I lets you describe a change in
+      plain language for it to rewrite the file (you'll get a diff to review
+      first). Keys stay in this tab and are never written to disk.</p>
+      <input id="aikey" type="password" placeholder="sk-ant-... (Claude)" style="width:100%;
+        background:var(--mask);border:1px solid var(--trace2);border-radius:3px;
+        padding:6px 8px;font-family:var(--mono);font-size:11.5px;margin-bottom:6px">
+      <input id="openaikey" type="password" placeholder="sk-... (OpenAI)" style="width:100%;
         background:var(--mask);border:1px solid var(--trace2);border-radius:3px;
         padding:6px 8px;font-family:var(--mono);font-size:11.5px">
     </div>
@@ -3371,6 +3546,9 @@ function openSetup() {
   const ai = $('#aikey');
   ai.value = aiKey;
   ai.oninput = () => { aiKey = ai.value.trim(); };
+  const oai = $('#openaikey');
+  oai.value = openaiKey;
+  oai.oninput = () => { openaiKey = oai.value.trim(); };
   $('#setup-run').onclick = runSetup;
 }
 
@@ -4460,6 +4638,7 @@ function showHelp() {
        ['Right arrow', 'Take one word of the prediction'],
        ['Ctrl Space', 'Open the suggestion list on demand'],
        ['Ctrl Shift P', 'Ask a model for a longer continuation'],
+       ['Ctrl I', 'Ask AI to rewrite this file from a description'],
        ['Ctrl F', 'Find in this file'],
        ['Ctrl G', 'Go to a line number'],
        ['Ctrl /', 'Comment or uncomment the selection'],
@@ -4516,6 +4695,7 @@ const DIAL_ITEMS = [
   { label: 'Rebuild', run: () => { St.cleanNext = true; toast('Next build starts from scratch'); build(false); } },
   { label: 'Update core', run: () => $('#btn-update').click() },
   { label: 'Erase flash', run: () => $('#btn-erase').click() },
+  { label: 'Ask AI', run: () => openAiPrompt() },
   { label: 'Shortcuts', run: () => showHelp() },
   { label: 'Commands', run: () => openPalette() },
 ];
@@ -4623,6 +4803,7 @@ const COMMANDS = () => [
   { label: 'Add file to sketch', run: newFile },
   { label: 'Rebuild from scratch', run: () => { St.cleanNext = true; build(false); } },
   { label: 'Setup and toolchain', run: openSetup },
+  { label: 'Ask AI...', hint: 'Ctrl I', run: openAiPrompt },
   { label: 'Keyboard shortcuts', run: showHelp },
   { label: 'Find in file', hint: 'Ctrl F', run: openFind },
 ];
@@ -4682,6 +4863,9 @@ addEventListener('keydown', e => {
   } else if (k === 'd' && document.activeElement === ta) {
     e.preventDefault();
     duplicateLine();
+  } else if (k === 'i') {
+    e.preventDefault();
+    openAiPrompt();
   }
 });
 addEventListener('keydown', e => {
