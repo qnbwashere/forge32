@@ -196,12 +196,17 @@ void loop() {
 
 async function ensureSketchbook() {
   await fsp.mkdir(SKETCHBOOK, { recursive: true });
+  // Seed the Blink example only into a genuinely empty sketchbook. This
+  // used to check for Blink specifically, which meant renaming or
+  // deleting it just brought it right back on the next sketch list
+  // refresh -- any sketch at all, including a renamed Blink, counts as
+  // "already seeded".
+  let entries = [];
+  try { entries = await fsp.readdir(SKETCHBOOK, { withFileTypes: true }); } catch { /* fresh dir */ }
+  if (entries.some((e) => e.isDirectory() && !e.name.startsWith('.'))) return;
   const first = path.join(SKETCHBOOK, 'Blink', 'Blink.ino');
-  try { await fsp.access(first); }
-  catch {
-    await fsp.mkdir(path.dirname(first), { recursive: true });
-    await fsp.writeFile(first, DEFAULT_SKETCH, 'utf8');
-  }
+  await fsp.mkdir(path.dirname(first), { recursive: true });
+  await fsp.writeFile(first, DEFAULT_SKETCH, 'utf8');
 }
 
 async function listSketches() {
@@ -477,6 +482,23 @@ const api = {
     if (path.resolve(dir) === path.resolve(SKETCHBOOK)) throw new Error('Refusing to delete the sketchbook root.');
     await fsp.rm(dir, { recursive: true, force: true });
     return { ok: true };
+  },
+
+  async 'POST /api/sketch/rename'(body) {
+    const oldName = String(body.name || '');
+    const clean = String(body.newName || '').replace(/[^A-Za-z0-9_ -]/g, '').trim();
+    if (!clean) throw new Error('Enter a valid name.');
+    const oldDir = safeSketchPath(oldName);
+    const newDir = safeSketchPath(clean);
+    if (path.resolve(oldDir) === path.resolve(newDir)) return { ok: true, name: clean };
+    const clash = await fsp.access(newDir).then(() => true, () => false);
+    if (clash) throw new Error('A sketch named "' + clean + '" already exists.');
+    await fsp.rename(oldDir, newDir);
+    // Arduino's toolchain expects the primary .ino to match its folder's
+    // name, so keep that in sync -- a sketch renamed but left with its old
+    // .ino name fails to compile with a confusing "no such file" error.
+    await fsp.rename(path.join(newDir, oldName + '.ino'), path.join(newDir, clean + '.ino')).catch(() => {});
+    return { ok: true, name: clean };
   },
 
   async 'GET /api/libraries'(q) {

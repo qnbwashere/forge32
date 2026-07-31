@@ -117,19 +117,41 @@ function stopServer() {
  * Primary path: electron-updater, pointed at GitHub releases via the
  * `publish` block in electron-builder.yml. This is the real silent
  * updater (NSIS on Windows, Squirrel.Mac on macOS) and works reliably on
- * Windows even unsigned. On macOS, Squirrel.Mac's silent update is only
- * reliable for signed/notarized apps; this build is ad hoc signed only,
- * so treat it as best effort there, not a guarantee.
+ * Windows even unsigned. On macOS, Squirrel.Mac validates the new
+ * package's code signature before it will install it, and this build is
+ * ad hoc signed (identity: null) rather than signed with a real Apple
+ * Developer ID -- ad hoc signatures aren't stable across builds, so that
+ * validation can never reliably pass here. Real silent updates on macOS
+ * would need paid Apple code signing plus notarization; treat this
+ * platform's silent path as best effort, not a guarantee.
  *
  * Fallback path: a plain HTTPS GET against the GitHub releases API,
  * compared against app.getVersion(). This runs regardless of whether the
  * primary path found anything, purely so the user is never left in the
- * dark if the silent path silently fails to find/apply an update on an
- * unsigned mac build. It only ever shows a "here's the direct download"
- * dialog -- it never downloads or installs anything itself.
+ * dark if the silent path silently fails to find/apply an update. It
+ * only ever shows a "here's the direct download" dialog -- it never
+ * downloads or installs anything itself, so it has no signing
+ * requirement to fail against.
+ *
+ * Everything here also writes to a small log file (userData/update.log)
+ * because the previous version of this code had no way to tell *why* a
+ * check produced nothing -- next time this is reported, that log is the
+ * first thing to check instead of guessing again.
  */
 
-let fallbackCheckDone = false;
+function updateLog(line) {
+  try {
+    const p = path.join(app.getPath('userData'), 'update.log');
+    const stamp = new Date().toISOString();
+    fs.appendFileSync(p, `[${stamp}] ${line}\n`);
+    // keep it small
+    const text = fs.readFileSync(p, 'utf8');
+    if (text.length > 50000) fs.writeFileSync(p, text.slice(-30000));
+  } catch { /* logging must never be why the app breaks */ }
+}
+
+let fallbackCheckInFlight = false;
+let fallbackSucceeded = false;
 
 function compareVersions(a, b) {
   const pa = a.replace(/^v/, '').split('.').map(Number);
@@ -142,8 +164,9 @@ function compareVersions(a, b) {
 }
 
 function checkForUpdatesFallback() {
-  if (fallbackCheckDone) return;
-  fallbackCheckDone = true;
+  if (fallbackCheckInFlight || fallbackSucceeded) return;
+  fallbackCheckInFlight = true;
+  updateLog('fallback: checking api.github.com/repos/qnbwashere/forge32/releases/latest');
   const req = https.get(
     {
       host: 'api.github.com',
@@ -155,11 +178,20 @@ function checkForUpdatesFallback() {
       let data = '';
       res.on('data', (d) => (data += d));
       res.on('end', () => {
+        fallbackCheckInFlight = false;
+        if (res.statusCode !== 200) {
+          // rate limited or otherwise blocked -- log it instead of silently
+          // treating "couldn't check" the same as "no update available"
+          updateLog(`fallback: HTTP ${res.statusCode} from GitHub, giving up for this launch: ${data.slice(0, 300)}`);
+          return;
+        }
         try {
           const json = JSON.parse(data);
           const latest = String(json.tag_name || '').trim();
-          if (!latest) return;
+          if (!latest) { updateLog('fallback: response had no tag_name'); return; }
+          updateLog(`fallback: latest is ${latest}, running ${app.getVersion()}`);
           if (compareVersions(latest, app.getVersion()) > 0) {
+            fallbackSucceeded = true;
             const url = json.html_url || 'https://github.com/qnbwashere/forge32/releases/latest';
             dialog.showMessageBox(win, {
               type: 'info',
@@ -173,12 +205,12 @@ function checkForUpdatesFallback() {
               if (r.response === 0) shell.openExternal(url);
             });
           }
-        } catch { /* malformed response, ignore */ }
+        } catch (e) { updateLog(`fallback: could not parse GitHub response: ${e.message}`); }
       });
     }
   );
-  req.on('timeout', () => req.destroy());
-  req.on('error', () => { /* offline or blocked, ignore */ });
+  req.on('timeout', () => { fallbackCheckInFlight = false; updateLog('fallback: request timed out'); req.destroy(); });
+  req.on('error', (e) => { fallbackCheckInFlight = false; updateLog(`fallback: request failed: ${e.message}`); });
 }
 
 function checkForUpdates() {
@@ -187,8 +219,13 @@ function checkForUpdates() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
+  autoUpdater.on('checking-for-update', () => updateLog('electron-updater: checking'));
+  autoUpdater.on('update-available', (info) => updateLog(`electron-updater: update available, ${info && info.version}`));
+  autoUpdater.on('update-not-available', (info) => updateLog(`electron-updater: no update, latest is ${info && info.version}`));
+
   autoUpdater.on('update-downloaded', () => {
-    fallbackCheckDone = true; // the real updater clearly worked, skip the fallback nag
+    fallbackSucceeded = true; // the real updater clearly worked, skip the fallback nag
+    updateLog('electron-updater: downloaded, prompting to restart');
     dialog.showMessageBox(win, {
       type: 'info',
       title: 'FORGE32 update ready',
@@ -205,23 +242,36 @@ function checkForUpdates() {
     });
   });
 
-  autoUpdater.on('error', () => {
-    // silent path failed (common on an unsigned mac build) -- fall back
-    // to a manual notification so the user still finds out.
+  autoUpdater.on('error', (e) => {
+    // silent path failed (expected on this ad hoc signed mac build) --
+    // fall back to a manual notification so the user still finds out.
+    updateLog(`electron-updater: error: ${e && (e.stack || e.message || e)}`);
     checkForUpdatesFallback();
   });
 
-  try {
-    autoUpdater.checkForUpdates();
-  } catch {
-    checkForUpdatesFallback();
-  }
+  autoUpdater.checkForUpdates().catch((e) => {
+    // already logged and handled via the 'error' event above; this catch
+    // exists purely so the rejected promise doesn't surface as an
+    // unhandled rejection warning.
+    updateLog(`electron-updater: checkForUpdates rejected: ${e && (e.message || e)}`);
+  });
 
   // Insurance: run the fallback check unconditionally a bit later too, in
   // case the primary updater neither errors nor finds anything wrong but
   // also never actually applies (observed Squirrel.Mac behavior on
-  // unsigned builds). checkForUpdatesFallback() is idempotent per launch.
+  // unsigned builds). checkForUpdatesFallback() is a no-op once it's
+  // already found and shown something this launch.
   setTimeout(checkForUpdatesFallback, 15000);
+}
+
+// A single check at launch only catches updates that existed before the
+// user opened the app. Re-check periodically too, so a session left
+// running for a while still notices a release that shipped after launch.
+function scheduleRecurringUpdateChecks() {
+  setInterval(() => {
+    fallbackSucceeded = false;
+    checkForUpdates();
+  }, 2 * 60 * 60 * 1000); // every 2 hours
 }
 
 /* ---------------------------------------------------------------- */
@@ -298,6 +348,7 @@ if (!app.requestSingleInstanceLock()) {
       menu();
       await createWindow();
       checkForUpdates();
+      scheduleRecurringUpdateChecks();
     } catch (err) {
       dialog.showErrorBox('FORGE32 could not start', String(err && err.message ? err.message : err));
       app.quit();

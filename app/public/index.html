@@ -294,6 +294,20 @@ button,input,select,textarea{font:inherit;color:inherit}
 .row:hover .kill{opacity:.7}
 .row .kill:hover{opacity:1;color:var(--hot)}
 .hint{padding:6px 2px;color:var(--dim);font-size:11px;line-height:1.5}
+.row-menu{
+  position:fixed;z-index:200;background:#1c1e22;border:1px solid var(--hair2);
+  border-radius:var(--r-sm);box-shadow:var(--sh-2);padding:4px;min-width:120px;
+  opacity:0;transform:translateY(-4px);
+  transition:opacity .12s,transform .12s var(--ease-spring);
+}
+.row-menu.open{opacity:1;transform:translateY(0)}
+.row-menu button{
+  display:block;width:100%;text-align:left;background:none;border:none;
+  padding:7px 10px;border-radius:var(--r-sm);cursor:pointer;color:var(--muted);
+  font-size:12px;font-family:var(--sans);transition:background .1s,color .1s;
+}
+.row-menu button:hover{background:rgba(255,255,255,.06);color:var(--flux)}
+.row-menu button[data-a="delete"]:hover{color:var(--hot)}
 
 /* ---------- main ---------- */
 #main{flex:1;display:flex;flex-direction:column;min-width:0;
@@ -3146,7 +3160,7 @@ addEventListener('keydown', e => {
    sketch does not drop the user into a native browser dialog that clashes
    with the rest of the app's look. Both resolve like their native namesakes:
    promptModal resolves the string or null, confirmModal resolves a bool. */
-function promptModal(title, label, placeholder, validate) {
+function promptModal(title, label, placeholder, validate, value) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (val) => {
@@ -3158,7 +3172,7 @@ function promptModal(title, label, placeholder, validate) {
     modal(title,
       '<div class="fields"><div class="field"><label class="silk">' + esc(label) +
       '</label><input id="mp-input" type="text" placeholder="' + esc(placeholder || '') +
-      '" autocomplete="off" spellcheck="false"></div>' +
+      '" value="' + esc(value || '') + '" autocomplete="off" spellcheck="false"></div>' +
       '<div class="hint" id="mp-err" style="padding-left:0;color:var(--hot);display:none"></div></div>',
       '<button class="btn" data-close>Cancel</button>' +
       '<button class="btn go" id="mp-ok">OK</button>');
@@ -3172,7 +3186,7 @@ function promptModal(title, label, placeholder, validate) {
     };
     $('#mp-ok').onclick = submit;
     input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } };
-    setTimeout(() => input.focus(), 30);
+    setTimeout(() => { input.focus(); input.select(); }, 30);
   });
 }
 function confirmModal(title, message, okLabel) {
@@ -3610,10 +3624,55 @@ async function loadSketchList() {
     : '<div class="hint">No sketches yet. Press + to start one.</div>';
   el.querySelectorAll('.row').forEach(r => {
     r.onclick = e => {
-      if (e.target.closest('.kill')) return deleteSketch(r.dataset.n);
+      const kill = e.target.closest('.kill');
+      if (kill) { e.stopPropagation(); return openRowMenu(kill, r.dataset.n); }
       openSketch(r.dataset.n);
     };
   });
+}
+
+/* the "..." on a sketch row opens a small menu (rename/delete) instead of
+   deleting directly -- it looks like a menu trigger, so it should be one */
+let rowMenuEl = null;
+function closeRowMenu() {
+  if (rowMenuEl) { rowMenuEl.remove(); rowMenuEl = null; }
+  document.removeEventListener('click', closeRowMenu);
+}
+function openRowMenu(btn, name) {
+  closeRowMenu();
+  const menu = document.createElement('div');
+  menu.className = 'row-menu';
+  menu.innerHTML = '<button data-a="rename">Rename</button><button data-a="delete">Delete</button>';
+  document.body.appendChild(menu);
+  const r = btn.getBoundingClientRect();
+  menu.style.top = (r.bottom + 4) + 'px';
+  menu.style.left = Math.min(r.left, innerWidth - menu.offsetWidth - 10) + 'px';
+  requestAnimationFrame(() => menu.classList.add('open'));
+  menu.querySelector('[data-a="rename"]').onclick = (e) => { e.stopPropagation(); closeRowMenu(); renameSketch(name); };
+  menu.querySelector('[data-a="delete"]').onclick = (e) => { e.stopPropagation(); closeRowMenu(); deleteSketch(name); };
+  rowMenuEl = menu;
+  setTimeout(() => document.addEventListener('click', closeRowMenu), 0);
+}
+
+async function renameSketch(name) {
+  const newName = await promptModal('Rename sketch', 'Name', '', (v) =>
+    !v ? 'Required.' :
+    !/^[A-Za-z0-9_][A-Za-z0-9_-]*$/.test(v) ? 'Use letters, numbers, underscore or dash.' :
+    null, name);
+  if (!newName || newName === name) return;
+  try {
+    const wasOpen = St.sketch === name;
+    const d = await api('/api/sketch/rename', { name, newName });
+    if (wasOpen) {
+      // the primary .ino got renamed on disk too, so the open file's name
+      // in St.files is now stale -- reload the sketch fresh rather than
+      // patch around it.
+      await openSketch(d.name);
+    } else {
+      loadSketchList();
+    }
+    toast('Renamed to ' + d.name, 'good');
+  } catch (e) { toast(e.message, 'bad'); }
 }
 
 async function openSketch(name) {
