@@ -161,7 +161,7 @@ export default function Page() {
           </div>
 
           <h1 className="mark">
-            Forge<b>32</b>
+            Nova<b>ESP</b>
           </h1>
 
           <p className="lede">

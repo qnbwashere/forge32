@@ -2,9 +2,9 @@
    NovaESP download page
    A hardware control panel resting on a bench mat, lit from one source:
    top left. Every highlight, bevel and shadow in this file agrees with
-   that light. Brushed graphite chassis, chrome knobs, a warm gold glow
-   for the lit state, a recessed LCD readout, and red kept for one
-   accent only (power).
+   that light. Brushed graphite chassis, chrome knobs, a purple glow for
+   the lit state, a recessed LCD readout, and red kept for one accent
+   only (power).
    ========================================================================== */
 
 :root {
@@ -15,8 +15,8 @@
   --silk:    #e9edf0;
   --silk-2:  #8b99a4;
   --silk-3:  #5d6b76;
-  --pad:     #d9a441;
-  --pad-hi:  #f0c469;
+  --pad:     #9b6fd9;
+  --pad-hi:  #c792ff;
   --rst:     #e7352c;
 
   --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -205,7 +205,7 @@ a { color: inherit; }
   width: 3px;
   border-radius: 2px;
   background: linear-gradient(180deg, transparent 0%, var(--pad-hi) 45%, var(--pad) 55%, transparent 100%);
-  box-shadow: 0 0 8px 1px rgba(240, 196, 105, 0.55);
+  box-shadow: 0 0 8px 1px rgba(199, 146, 255, 0.55);
   opacity: 0.85;
 }
 
@@ -213,7 +213,7 @@ a { color: inherit; }
   .side-vent { display: none; }
 }
 
-/* --- pin rail: domed gold pads ------------------------------------------- */
+/* --- pin rail: domed purple pads ------------------------------------------ */
 
 .rail {
   border-right: var(--edge);
@@ -249,7 +249,7 @@ a { color: inherit; }
   border-radius: 50%;
   flex: none;
   background:
-    radial-gradient(circle at 32% 28%, #fff6db 0%, #f6d488 16%, var(--pad) 52%, #a97a2a 84%, #7a5a20 100%);
+    radial-gradient(circle at 32% 28%, #f5e9ff 0%, #d9b3ff 16%, var(--pad) 52%, #7c4fb0 84%, #4a2d70 100%);
   box-shadow:
     0 1.5px 2px rgba(0, 0, 0, 0.55),
     0 0 0 1px rgba(0, 0, 0, 0.35),
@@ -287,7 +287,7 @@ a { color: inherit; }
 .mark b {
   color: var(--pad);
   font-weight: 700;
-  text-shadow: 0 -1.5px 0 rgba(255, 224, 160, 0.35), 0 1.5px 0 rgba(0, 0, 0, 0.7);
+  text-shadow: 0 -1.5px 0 rgba(235, 210, 255, 0.35), 0 1.5px 0 rgba(0, 0, 0, 0.7);
 }
 
 .lede {
@@ -403,7 +403,7 @@ a { color: inherit; }
   flex: none;
   box-shadow: inset 0.5px 0.5px 0.5px rgba(255, 255, 255, 0.3);
 }
-.term-bar .dot.live { background: var(--pad); box-shadow: 0 0 5px rgba(217, 164, 65, 0.8); }
+.term-bar .dot.live { background: var(--pad); box-shadow: 0 0 5px rgba(155, 111, 217, 0.8); }
 .term-bar .dot.done { background: #4fb477; box-shadow: 0 0 5px rgba(79, 180, 119, 0.8); }
 
 .term-body {
@@ -423,7 +423,7 @@ a { color: inherit; }
 .term-body .ln { display: block; }
 .term-body .k  { color: #d7e6dc; text-shadow: 0 0 9px rgba(180, 230, 195, 0.55); }
 .term-body .g  { color: #6bdc93; text-shadow: 0 0 9px rgba(107, 220, 147, 0.6); }
-.term-body .a  { color: var(--pad-hi); text-shadow: 0 0 9px rgba(240, 196, 105, 0.6); }
+.term-body .a  { color: var(--pad-hi); text-shadow: 0 0 9px rgba(199, 146, 255, 0.6); }
 
 .caret {
   display: inline-block;
@@ -431,7 +431,7 @@ a { color: inherit; }
   height: 14px;
   vertical-align: -2px;
   background: var(--pad-hi);
-  box-shadow: 0 0 8px rgba(240, 196, 105, 0.7);
+  box-shadow: 0 0 8px rgba(199, 146, 255, 0.7);
   animation: blink 1s steps(2, start) infinite;
 }
 
@@ -481,8 +481,8 @@ a { color: inherit; }
   box-shadow: inset 0.5px 0.5px 1px rgba(0, 0, 0, 0.6);
 }
 .mini-toggle.on i::after {
-  background: radial-gradient(circle at 32% 28%, #fff6db 0%, var(--pad-hi) 45%, var(--pad) 100%);
-  box-shadow: 0 0 6px rgba(240, 196, 105, 0.85), inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.6);
+  background: radial-gradient(circle at 32% 28%, #f5e9ff 0%, var(--pad-hi) 45%, var(--pad) 100%);
+  box-shadow: 0 0 6px rgba(199, 146, 255, 0.85), inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.6);
 }
 .mini-toggle .silk { transition: color 0.15s; }
 .mini-toggle.on .silk { color: var(--pad-hi); }
@@ -553,7 +553,7 @@ a { color: inherit; }
   box-shadow:
     0 3px 6px rgba(0, 0, 0, 0.5),
     inset 0 0 0 2px var(--pad),
-    0 0 14px -2px rgba(217, 164, 65, 0.6);
+    0 0 14px -2px rgba(155, 111, 217, 0.6);
 }
 .sat-knob .silk { transition: color 0.15s; }
 .sat-knob.on .silk { color: var(--pad-hi); }
@@ -587,9 +587,9 @@ a { color: inherit; }
     from 148deg,
     var(--pad-hi) 0%,
     var(--pad-hi) var(--ring),
-    rgba(217, 164, 65, 0.14) var(--ring)
+    rgba(155, 111, 217, 0.14) var(--ring)
   );
-  box-shadow: 0 0 20px -4px rgba(217, 164, 65, 0.5);
+  box-shadow: 0 0 20px -4px rgba(155, 111, 217, 0.5);
   transition: box-shadow 0.15s ease;
 }
 
@@ -619,7 +619,7 @@ a { color: inherit; }
   background: linear-gradient(180deg, #2a2f33, #101214);
   transform-origin: 50% 31px;
   transform: translateX(-50%) rotate(var(--angle));
-  box-shadow: 0 0 5px rgba(217, 164, 65, 0.65);
+  box-shadow: 0 0 5px rgba(155, 111, 217, 0.65);
   transition: transform 0.2s ease;
 }
 
@@ -629,7 +629,7 @@ a { color: inherit; }
     repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.12) 0deg 2deg, rgba(0, 0, 0, 0.05) 2deg 4deg);
 }
 
-.dl-hero.armed .dl-ring { box-shadow: 0 0 26px -2px rgba(217, 164, 65, 0.75); }
+.dl-hero.armed .dl-ring { box-shadow: 0 0 26px -2px rgba(155, 111, 217, 0.75); }
 
 /* a genuine mechanical press: the whole knob sinks, shadow collapses */
 .dl-hero:active .dl-knob {
@@ -640,7 +640,7 @@ a { color: inherit; }
     inset -1px -1px 2px rgba(0, 0, 0, 0.4),
     0 0 0 4px #101214;
 }
-.dl-hero:active .dl-ring { box-shadow: 0 0 10px -4px rgba(217, 164, 65, 0.4); }
+.dl-hero:active .dl-ring { box-shadow: 0 0 10px -4px rgba(155, 111, 217, 0.4); }
 
 .dl-label {
   display: flex;

@@ -20,9 +20,9 @@ export const viewport: Viewport = {
   themeColor: '#10161c',
 };
 
-// A gold pad on dark soldermask, same as the pin rail.
+// A purple pad on dark soldermask, same as the pin rail.
 const favicon =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%2310161c'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%23d9a441' stroke-width='4'/%3E%3C/svg%3E";
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%2310161c'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%239b6fd9' stroke-width='4'/%3E%3C/svg%3E";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
