@@ -473,7 +473,12 @@ async function handleAiEdit(body, stm) {
   const PATH = await getShellPath();
   const code = await new Promise((resolve) => {
     let child;
-    try { child = spawn(bin, args, { cwd: tmpDir, env: { ...process.env, PATH }, shell: true }); }
+    // stdin defaults to an open, never-written-to pipe, and Claude Code
+    // waits a few seconds to see if anything's coming through it before
+    // giving up and printing a warning -- there's nothing to send it (the
+    // instruction is already an argument, the file context is the temp
+    // copy), so just don't open the pipe at all.
+    try { child = spawn(bin, args, { cwd: tmpDir, env: { ...process.env, PATH }, shell: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
     catch (e) { stm.send({ t: 'err', line: 'Could not start ' + bin + ': ' + e.message }); return resolve(-1); }
     const timer = setTimeout(() => { try { child.kill(); } catch {} }, 8 * 60 * 1000);
     const tail = { out: '', err: '' };
