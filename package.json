@@ -1,7 +1,7 @@
 {
   "name": "forge32",
   "productName": "FORGE32",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "An ESP32 IDE that compiles, flashes and monitors without a toolchain setup",
   "repository": "github:qnbwashere/forge32",
   "main": "electron/main.js",
