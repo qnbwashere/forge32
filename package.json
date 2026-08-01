@@ -1,7 +1,7 @@
 {
   "name": "forge32",
   "productName": "NovaESP",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "An ESP32 IDE that compiles, flashes and monitors without a toolchain setup",
   "repository": "github:qnbwashere/forge32",
   "main": "electron/main.js",
