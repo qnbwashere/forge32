@@ -174,6 +174,19 @@ function safeSketchPath(rel) {
   return full;
 }
 
+/* What's actually wired to each pin lives in a sidecar file, not as
+   comments threaded through the .ino -- comments drift out of sync the
+   moment a line moves, and this survives edits to the real code untouched.
+   Dot-prefixed so it reads as app metadata, not a file to open and edit,
+   and the existing file-listing regex already ignores anything that isn't
+   .ino/.h/.hpp/.c/.cpp so it never shows up as a tab either. */
+function pinsFilePath(dir) { return path.join(dir, '.forge32-pins.json'); }
+
+async function readPinLabels(dir) {
+  try { return JSON.parse(await fsp.readFile(pinsFilePath(dir), 'utf8')); }
+  catch { return {}; }
+}
+
 const DEFAULT_SKETCH = `/*  Blink and talk
  *  Board: ESP32 Dev Module   Baud: 115200
  */
@@ -605,7 +618,20 @@ const api = {
       if (!main && /\.ino$/i.test(e.name)) main = e.name;
     }
     if (!Object.keys(files).length) throw new Error('Sketch not found: ' + name);
-    return { ok: true, name, files, main: main || Object.keys(files)[0] };
+    const pinLabels = await readPinLabels(dir);
+    return { ok: true, name, files, main: main || Object.keys(files)[0], pinLabels };
+  },
+
+  async 'POST /api/sketch/pin-label'(body) {
+    const dir = safeSketchPath(body.name || '');
+    const pin = String(Number(body.pin));
+    if (!/^\d+$/.test(pin)) throw new Error('Invalid pin number.');
+    const labels = await readPinLabels(dir);
+    const label = String(body.label ?? '').trim();
+    if (!label) delete labels[pin];
+    else labels[pin] = { label, confirmed: !!body.confirmed, updatedAt: Date.now() };
+    await fsp.writeFile(pinsFilePath(dir), JSON.stringify(labels, null, 2), 'utf8');
+    return { ok: true, pinLabels: labels };
   },
 
   async 'POST /api/sketch'(body) {

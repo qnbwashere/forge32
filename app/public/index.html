@@ -558,6 +558,28 @@ button,input,select,textarea{font:inherit;color:inherit}
 .pin.pwr .pad{border-color:var(--hot);background:#1c100e}
 .pin.gnd{color:var(--dim)}
 .pin.gnd .pad{border-color:var(--dim)}
+/* a labeled pin (something's been confirmed as connected to it) gets a
+   small ring around the pad -- distinct from the solid gold fill .used
+   already gets for "referenced somewhere in the code", since a pin can be
+   labeled without being referenced yet, or referenced without being
+   labeled */
+.pin.labeled .pad{box-shadow:0 0 0 2px rgba(199,227,110,.5),inset 0 1px 1.5px rgba(0,0,0,.6)}
+.pin-conn{
+  display:flex;align-items:center;gap:7px;margin:0 0 7px;padding:6px 8px;
+  border-radius:var(--r-sm);background:rgba(255,255,255,.03);
+}
+.pin-conn-ask{background:rgba(199,227,110,.05)}
+.pc-label{flex:1;color:var(--flux);font-weight:500}
+.pc-q{flex:1}
+.pc-q b{color:var(--flux)}
+.pc-edit,.pc-yes,.pc-no{
+  flex:none;background:none;border:1px solid var(--trace2);border-radius:3px;
+  padding:3px 8px;font-family:var(--sans);font-size:10.5px;color:var(--muted);
+  cursor:pointer;transition:color .12s,border-color .12s,background .12s;
+}
+.pc-edit:hover,.pc-no:hover{color:var(--flux);border-color:var(--hair2)}
+.pc-yes{color:var(--gold);border-color:rgba(199,227,110,.35)}
+.pc-yes:hover{background:rgba(199,227,110,.12)}
 #pindoc{
   margin-top:12px;border-radius:var(--r-md);background:rgba(255,255,255,.02);
   padding:11px 12px;font-size:11.5px;line-height:1.5;color:var(--muted);
@@ -2204,7 +2226,7 @@ const St = {
   sketch: null, files: {}, active: '', dirty: new Set(),
   diags: [], marksOn: true, ghostOn: true, acAuto: true,
   ghostText: '', ghostAt: -1, ghostConsume: 0, snipStops: [], snipEnd: -1,
-  findMatches: [], findIdx: 0, blockState: [],
+  findMatches: [], findIdx: 0, blockState: [], pinLabels: {},
 };
 
 function text() { return ta.value; }
@@ -3917,6 +3939,7 @@ async function openSketch(name) {
   const d = await api('/api/sketch?name=' + encodeURIComponent(name));
   St.sketch = d.name;
   St.files = d.files;
+  St.pinLabels = d.pinLabels || {};
   St.dirty.clear();
   openFile(d.main in d.files ? d.main : Object.keys(d.files)[0]);
   paintTabs();
@@ -4427,7 +4450,28 @@ function showPin(n, animate) {
   if (!p) return;
   const uses = (St.usedPins && St.usedPins.get(n)) || [];
   const hint = St.pinHints && St.pinHints.get(n);
+  const guess = St.pinGuesses && St.pinGuesses.get(n);
+  const saved = St.pinLabels && St.pinLabels[n];
   const doc = $('#pindoc');
+
+  // What's physically wired here is a fact about the breadboard, not the
+  // code -- a code-derived guess (from the pin's variable name) is offered
+  // as a one-tap yes/no, but once the user's confirmed or corrected it,
+  // their answer wins over the guess every time this panel repaints.
+  let connHtml;
+  if (saved && saved.label) {
+    connHtml = '<div class="pin-conn"><span class="pc-label">' +
+      (saved.confirmed ? '\u2713 ' : '') + esc(saved.label) + '</span>' +
+      '<button class="pc-edit" data-n="' + n + '">Edit</button></div>';
+  } else if (guess) {
+    connHtml = '<div class="pin-conn pin-conn-ask"><span class="pc-q">Guess: <b>' +
+      esc(guess) + '</b>?</span><button class="pc-yes" data-n="' + n + '">Yes</button>' +
+      '<button class="pc-no" data-n="' + n + '">Tell me</button></div>';
+  } else {
+    connHtml = '<div class="pin-conn pin-conn-ask"><span class="pc-q">What\u2019s connected here?</span>' +
+      '<button class="pc-no" data-n="' + n + '">Label it</button></div>';
+  }
+
   let usageHtml = '';
   if (uses.length) {
     const seen = new Map();
@@ -4443,18 +4487,51 @@ function showPin(n, animate) {
     }).join('') + '</div>';
   }
   doc.innerHTML = '<h4>GPIO' + n + (uses.length ? '  \u00b7  used in this sketch' : '') +
-    '</h4>' + usageHtml +
+    '</h4>' + connHtml + usageHtml +
     '<p class="pu-note">' + (p.notes.length ? p.notes.map(esc).join(' ') :
       'General purpose. No special limits.') + '</p>' +
     '<div class="tags">' + p.tags.map(t => '<span class="tag' +
       (['flash', 'strapping', 'input only', 'ADC2', 'USB', 'psram'].includes(t)
         ? ' bad' : '') + '">' + esc(t) + '</span>').join('') + '</div>';
   doc.querySelectorAll('.pu-line').forEach(el => el.onclick = () => gotoLine(+el.dataset.line));
+  const yesBtn = doc.querySelector('.pc-yes');
+  if (yesBtn) yesBtn.onclick = () => savePinLabel(n, guess, true);
+  const noBtn = doc.querySelector('.pc-no');
+  if (noBtn) noBtn.onclick = () => askPinLabel(n);
+  const editBtn = doc.querySelector('.pc-edit');
+  if (editBtn) editBtn.onclick = () => askPinLabel(n);
   if (animate) {
     doc.classList.remove('pop');
     void doc.offsetWidth;
     doc.classList.add('pop');
   }
+}
+
+async function askPinLabel(n) {
+  const current = (St.pinLabels && St.pinLabels[n] && St.pinLabels[n].label) || '';
+  // no "Required" validation -- submitting empty clears an existing label,
+  // matching the backend's contract (an empty label deletes the entry)
+  const label = await promptModal('Label GPIO' + n, 'What\u2019s connected here?',
+    'e.g. soil moisture sensor', () => null, current);
+  if (label === null) return;
+  savePinLabel(n, label, true);
+}
+
+async function savePinLabel(n, label, confirmed) {
+  if (!St.sketch) return toast('Open a sketch first', 'bad');
+  try {
+    const r = await api('/api/sketch/pin-label', { name: St.sketch, pin: n, label, confirmed });
+    St.pinLabels = r.pinLabels;
+    updatePinLabelMarkers();
+    showPin(n, true);
+    toast(label ? 'Saved' : 'Cleared', 'good');
+  } catch (e) { toast(e.message, 'bad'); }
+}
+
+function updatePinLabelMarkers() {
+  $$('#pins .pin').forEach((el) => {
+    el.classList.toggle('labeled', !!(St.pinLabels && St.pinLabels[+el.dataset.p]));
+  });
 }
 
 /* Role text for calls whose meaning doesn't change with their arguments --
@@ -4501,19 +4578,26 @@ function roleFor(fn, arg) {
    signal of real-world intent than "GPIO2 was passed to digitalWrite",
    so surface it instead of leaving the reader to guess from raw API calls */
 const NAME_HINTS = [
-  [/led/i, 'looks like it drives an LED, based on its name'],
-  [/(button|btn)/i, 'looks like it reads a button, based on its name'],
-  [/relay/i, 'looks like it drives a relay, based on its name'],
-  [/servo/i, 'looks like it drives a servo, based on its name'],
-  [/motor/i, 'looks like it drives a motor, based on its name'],
-  [/(buzzer|piezo|speaker)/i, 'looks like it drives a buzzer, based on its name'],
-  [/(pir|motion|pir_?sensor)/i, 'looks like a PIR motion sensor, based on its name'],
-  [/trig/i, 'looks like an ultrasonic sensor’s trigger pin, based on its name'],
-  [/echo/i, 'looks like an ultrasonic sensor’s echo pin, based on its name'],
-  [/(dht|temp|humid)/i, 'looks like a temperature/humidity sensor, based on its name'],
-  [/(sda)/i, 'looks like an I2C data line, based on its name'],
-  [/(scl)/i, 'looks like an I2C clock line, based on its name'],
+  [/led/i, 'looks like it drives an LED, based on its name', 'an LED'],
+  [/(button|btn)/i, 'looks like it reads a button, based on its name', 'a button'],
+  [/relay/i, 'looks like it drives a relay, based on its name', 'a relay'],
+  [/servo/i, 'looks like it drives a servo, based on its name', 'a servo'],
+  [/motor/i, 'looks like it drives a motor, based on its name', 'a motor'],
+  [/(buzzer|piezo|speaker)/i, 'looks like it drives a buzzer, based on its name', 'a buzzer'],
+  [/(pir|motion|pir_?sensor)/i, 'looks like a PIR motion sensor, based on its name', 'a PIR motion sensor'],
+  [/trig/i, 'looks like an ultrasonic sensor’s trigger pin, based on its name', 'an ultrasonic sensor (trigger)'],
+  [/echo/i, 'looks like an ultrasonic sensor’s echo pin, based on its name', 'an ultrasonic sensor (echo)'],
+  [/(dht|temp|humid)/i, 'looks like a temperature/humidity sensor, based on its name', 'a temperature/humidity sensor'],
+  [/(sda)/i, 'looks like an I2C data line, based on its name', 'an I2C data line (SDA)'],
+  [/(scl)/i, 'looks like an I2C clock line, based on its name', 'an I2C clock line (SCL)'],
 ];
+/* the short noun phrase (NAME_HINTS[][2]) is what gets offered as a
+   one-click "yes, that's right" guess; the full sentence is just the
+   passive commentary shown alongside the raw code usage */
+function guessFor(name) {
+  const hit = NAME_HINTS.find(([re]) => re.test(name));
+  return hit ? hit[2] : null;
+}
 function hintFor(name) {
   const hit = NAME_HINTS.find(([re]) => re.test(name));
   return hit ? hit[1] : null;
@@ -4530,6 +4614,7 @@ function updatePinUse() {
     consts[m[1]] = +m[2];
   const used = new Map();
   const hints = new Map();
+  const guesses = new Map();
   const lineOf = idx => (src.slice(0, idx).match(/\n/g) || []).length + 1;
   const funcAt = idx => {
     const before = src.slice(0, idx);
@@ -4551,6 +4636,8 @@ function updatePinUse() {
     if (!/^\d+$/.test(v) && !hints.has(n)) {
       const h = hintFor(v);
       if (h) hints.set(n, h);
+      const g = guessFor(v);
+      if (g) guesses.set(n, g);
     }
   };
   const single = /\b(pinMode|digitalWrite|digitalRead|analogRead|analogReadMilliVolts|analogWrite|touchRead|dacWrite|ledcAttach|ledcWrite|ledcDetach|attachInterrupt|detachInterrupt|pulseIn|tone|noTone|touchAttachInterrupt|digitalPinToInterrupt|esp_sleep_enable_ext0_wakeup)\s*\(\s*([A-Za-z_]\w*|\d+|GPIO_NUM_\d+)\s*(?:,\s*([^,)]+))?/g;
@@ -4568,8 +4655,10 @@ function updatePinUse() {
     record(m[1], m.index, 'driving a NeoPixel strip');
   St.usedPins = used;
   St.pinHints = hints;
+  St.pinGuesses = guesses;
   $$('#pins .pin').forEach(el =>
     el.classList.toggle('used', used.has(+el.dataset.p)));
+  updatePinLabelMarkers();
   if (St.selectedPin != null && used.has(St.selectedPin)) showPin(St.selectedPin);
   const riskyNums = [...used.keys()].filter(n => {
     const p = PINS.pins.find(x => x.n === n);
