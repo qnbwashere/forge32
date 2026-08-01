@@ -1,6 +1,6 @@
 'use strict';
 /*
- * FORGE32 desktop shell.
+ * NovaESP desktop shell.
  * Boots the local IDE server as a child process, waits for it to answer,
  * then opens a window on it. The bundled arduino-cli is handed to the
  * server through FORGE32_CLI so the user never installs a toolchain.
@@ -25,6 +25,16 @@ const CLI_EXE = process.platform === 'win32' ? 'arduino-cli.exe' : 'arduino-cli'
 let child = null;
 let win = null;
 let port = 0;
+
+/* Rebranded from FORGE32 -- new installs get ~/NovaESP, but anyone
+   updating who already has sketches in ~/Forge32 keeps using that folder
+   rather than the app silently "losing" them behind a new, empty one. */
+function sketchbookDir() {
+  const novaDir = path.join(os.homedir(), 'NovaESP');
+  const legacyDir = path.join(os.homedir(), 'Forge32');
+  if (!fs.existsSync(novaDir) && fs.existsSync(legacyDir)) return legacyDir;
+  return novaDir;
+}
 
 /* ---------------------------------------------------------------- */
 
@@ -66,11 +76,11 @@ function startServer() {
   const env = Object.assign({}, process.env, {
     // Without this, fork() re-launches the packaged Electron binary itself
     // rather than running server.js as plain Node, so the "child" is just a
-    // second instance of FORGE32 that immediately quits (single instance
+    // second instance of NovaESP that immediately quits (single instance
     // lock) and the real server never starts.
     ELECTRON_RUN_AS_NODE: '1',
     FORGE32_PORT: String(port),
-    FORGE32_SKETCHBOOK: path.join(os.homedir(), 'Forge32'),
+    FORGE32_SKETCHBOOK: sketchbookDir(),
   });
   if (fs.existsSync(cli)) {
     // make sure the shipped binary is executable (dmg/zip can drop the bit)
@@ -98,8 +108,8 @@ function startServer() {
     if (!app.isQuitting && code !== 0) {
       const reason = lastErr.trim() || `no output captured (exit code ${code}${signal ? ', signal ' + signal : ''})`;
       dialog.showErrorBox(
-        'FORGE32 stopped',
-        'The build service exited unexpectedly. Reopen FORGE32 to restart it.\n\n' + reason
+        'NovaESP stopped',
+        'The build service exited unexpectedly. Reopen NovaESP to restart it.\n\n' + reason
       );
     }
   });
@@ -163,6 +173,64 @@ function compareVersions(a, b) {
   return 0;
 }
 
+function pickAssetName() {
+  if (process.platform === 'darwin') {
+    return process.arch === 'arm64' ? 'NovaESP-mac-arm64.dmg' : 'NovaESP-mac-x64.dmg';
+  }
+  if (process.platform === 'win32') return 'NovaESP-win-x64.exe';
+  return null;
+}
+
+/* GitHub asset URLs 302 to S3/Azure, so this has to follow redirects
+   itself -- https.get doesn't. */
+function downloadToFile(url, destPath) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destPath);
+    const cleanupAndReject = (e) => { file.close(); fs.unlink(destPath, () => {}); reject(e); };
+    const request = (u) => {
+      https.get(u, { headers: { 'User-Agent': 'NovaESP-updater' } }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          return request(res.headers.location);
+        }
+        if (res.statusCode !== 200) return cleanupAndReject(new Error('HTTP ' + res.statusCode));
+        res.pipe(file);
+        file.on('finish', () => file.close(() => resolve()));
+      }).on('error', cleanupAndReject);
+    };
+    request(url);
+  });
+}
+
+/* Real silent replacement needs a signature Squirrel.Mac can verify
+   against the previous build, which an ad hoc signature (see SETUP.md)
+   can't provide -- there's no way around that without a paid Apple
+   Developer ID cert. This is the next best thing: instead of "Download"
+   opening a GitHub release page the user has to search for the right file
+   on, fetch the exact asset for this platform/arch and open it directly
+   -- a mounted .dmg or a launched installer is one drag/click away,
+   rather than several. */
+async function downloadAndOpenUpdate(json) {
+  const releasePage = json.html_url || 'https://github.com/qnbwashere/forge32/releases/latest';
+  const assetName = pickAssetName();
+  const asset = assetName && (json.assets || []).find((a) => a.name === assetName);
+  if (!asset) {
+    updateLog(`fallback: no matching asset (${assetName}) in release yet, opening release page instead`);
+    shell.openExternal(releasePage);
+    return;
+  }
+  const dest = path.join(os.tmpdir(), asset.name);
+  updateLog(`fallback: downloading ${asset.name}`);
+  try {
+    await downloadToFile(asset.browser_download_url, dest);
+    updateLog(`fallback: downloaded to ${dest}, opening`);
+    shell.openPath(dest); // mounts the dmg in Finder, or launches the exe installer
+  } catch (e) {
+    updateLog(`fallback: download failed (${e.message}), opening release page instead`);
+    shell.openExternal(releasePage);
+  }
+}
+
 function checkForUpdatesFallback() {
   if (fallbackCheckInFlight || fallbackSucceeded) return;
   fallbackCheckInFlight = true;
@@ -171,7 +239,7 @@ function checkForUpdatesFallback() {
     {
       host: 'api.github.com',
       path: '/repos/qnbwashere/forge32/releases/latest',
-      headers: { 'User-Agent': 'FORGE32-updater' },
+      headers: { 'User-Agent': 'NovaESP-updater' },
       timeout: 8000,
     },
     (res) => {
@@ -192,17 +260,16 @@ function checkForUpdatesFallback() {
           updateLog(`fallback: latest is ${latest}, running ${app.getVersion()}`);
           if (compareVersions(latest, app.getVersion()) > 0) {
             fallbackSucceeded = true;
-            const url = json.html_url || 'https://github.com/qnbwashere/forge32/releases/latest';
             dialog.showMessageBox(win, {
               type: 'info',
-              title: 'FORGE32 update available',
-              message: `FORGE32 ${latest} is available (you have ${app.getVersion()}).`,
-              detail: 'Automatic updates on this platform may not have applied yet. Click Download to get it directly.',
+              title: 'NovaESP update available',
+              message: `NovaESP ${latest} is available (you have ${app.getVersion()}).`,
+              detail: 'Automatic updates on this platform may not have applied yet. Download fetches and opens the installer for you -- just drag it in (Mac) or run it through (Windows).',
               buttons: ['Download', 'Later'],
               defaultId: 0,
               cancelId: 1,
             }).then((r) => {
-              if (r.response === 0) shell.openExternal(url);
+              if (r.response === 0) downloadAndOpenUpdate(json);
             });
           }
         } catch (e) { updateLog(`fallback: could not parse GitHub response: ${e.message}`); }
@@ -228,8 +295,8 @@ function checkForUpdates() {
     updateLog('electron-updater: downloaded, prompting to restart');
     dialog.showMessageBox(win, {
       type: 'info',
-      title: 'FORGE32 update ready',
-      message: 'A new version of FORGE32 has been downloaded.',
+      title: 'NovaESP update ready',
+      message: 'A new version of NovaESP has been downloaded.',
       detail: 'Restart now to install it, or it will install the next time you quit.',
       buttons: ['Restart now', 'Later'],
       defaultId: 0,
@@ -283,7 +350,7 @@ function menu() {
     {
       label: 'File',
       submenu: [
-        { label: 'Open sketchbook folder', click: () => shell.openPath(path.join(os.homedir(), 'Forge32')) },
+        { label: 'Open sketchbook folder', click: () => shell.openPath(sketchbookDir()) },
         { type: 'separator' },
         mac ? { role: 'close' } : { role: 'quit' },
       ],
@@ -312,7 +379,7 @@ async function createWindow() {
     minHeight: 660,
     backgroundColor: '#10161c',
     show: false,
-    title: 'FORGE32',
+    title: 'NovaESP',
     autoHideMenuBar: process.platform === 'win32',
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
@@ -350,7 +417,7 @@ if (!app.requestSingleInstanceLock()) {
       checkForUpdates();
       scheduleRecurringUpdateChecks();
     } catch (err) {
-      dialog.showErrorBox('FORGE32 could not start', String(err && err.message ? err.message : err));
+      dialog.showErrorBox('NovaESP could not start', String(err && err.message ? err.message : err));
       app.quit();
     }
   });

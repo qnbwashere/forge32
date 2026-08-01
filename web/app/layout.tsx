@@ -6,11 +6,11 @@ import '@fontsource/ibm-plex-mono/500.css';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'FORGE32 — ESP32 IDE',
+  title: 'NovaESP — ESP32 IDE',
   description:
-    'Download FORGE32 for macOS or Windows. Write, compile, flash and monitor ESP32 boards with the toolchain already inside.',
+    'Download NovaESP for macOS or Windows. Write, compile, flash and monitor ESP32 boards with the toolchain already inside.',
   openGraph: {
-    title: 'FORGE32 — ESP32 IDE',
+    title: 'NovaESP — ESP32 IDE',
     description: 'Write, compile, flash and monitor ESP32 boards. Toolchain included.',
     type: 'website',
   },

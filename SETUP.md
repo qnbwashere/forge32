@@ -1,4 +1,4 @@
-# Shipping FORGE32
+# Shipping NovaESP
 
 Two hosts, each doing what it is good at:
 
@@ -14,7 +14,7 @@ Vercel caps a deployment at 100 MB and is not meant to host binaries, which is w
 ```bash
 cd forge32
 git init && git add -A
-git commit -m "FORGE32"
+git commit -m "NovaESP"
 git branch -M main
 git remote add origin https://github.com/qnbwashere/forge32.git
 git push -u origin main
@@ -33,13 +33,13 @@ That triggers `.github/workflows/release.yml`, which runs three jobs in parallel
 
 | Job | Runner | Output |
 |---|---|---|
-| macOS Apple silicon | macos-14 | `FORGE32-mac-arm64.dmg` |
-| macOS Intel | macos-14 | `FORGE32-mac-x64.dmg` |
-| Windows | windows-latest | `FORGE32-win-x64.exe` |
+| macOS Apple silicon | macos-14 | `NovaESP-mac-arm64.dmg` |
+| macOS Intel | macos-14 | `NovaESP-mac-x64.dmg` |
+| Windows | windows-latest | `NovaESP-win-x64.exe` |
 
 Each job downloads the matching `arduino-cli` build and packages it inside the app, so the installed IDE has a working compiler and uploader with nothing else to install.
 
-The filenames deliberately carry **no version number**. That is what makes `releases/latest/download/FORGE32-mac-arm64.dmg` a permanent URL, so the website never needs updating when you cut a release.
+The filenames deliberately carry **no version number**. That is what makes `releases/latest/download/NovaESP-mac-arm64.dmg` a permanent URL, so the website never needs updating when you cut a release.
 
 ## 3. Deploy the site
 
@@ -77,7 +77,7 @@ I would rather name these than let you find them on a new laptop.
 
 **The unsigned app warning.** Apple charges $99 a year for a developer certificate and Windows code signing certificates run $200 to $400 a year. Without them the OS asks for confirmation the first time:
 
-- macOS: right click the app → **Open** → **Open**. Once, per machine. If Sequoia or later refuses outright, `xattr -dr com.apple.quarantine /Applications/FORGE32.app` clears it.
+- macOS: right click the app → **Open** → **Open**. Once, per machine. If Sequoia or later refuses outright, `xattr -dr com.apple.quarantine /Applications/NovaESP.app` clears it.
 - Windows: **More info** → **Run anyway**. Once.
 
 For your own machines this is a two second annoyance. If you ever hand the app to strangers, that is when the certificates start being worth the money. To add notarization later: set `identity` in `electron-builder.yml`, add `notarize: true`, and put `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID` into repo secrets.

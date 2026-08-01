@@ -76,14 +76,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
-          name: FORGE32 ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          name: NovaESP ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
           draft: false
           prerelease: false
           fail_on_unmatched_files: false
           files: |
-            dist/FORGE32-mac-arm64.dmg
-            dist/FORGE32-mac-x64.dmg
-            dist/FORGE32-win-x64.exe
+            dist/NovaESP-mac-arm64.dmg
+            dist/NovaESP-mac-x64.dmg
+            dist/NovaESP-win-x64.exe
             dist/*.zip
             dist/*.blockmap
             dist/latest*.yml

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * FORGE32 backend
+ * NovaESP backend
  * A zero dependency Node server that wraps arduino-cli so the browser IDE can
  * really compile and really flash an ESP32. Binds to loopback only.
  */
@@ -17,7 +17,17 @@ const { spawn, execFile } = require('node:child_process');
 const PORT = Number(process.env.FORGE32_PORT || 4032);
 const HOST = '127.0.0.1';
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const SKETCHBOOK = process.env.FORGE32_SKETCHBOOK || path.join(os.homedir(), 'Forge32');
+// Electron's main.js always sets FORGE32_SKETCHBOOK (see sketchbookDir()
+// there for the ~/Forge32 -> ~/NovaESP migration); this fallback only
+// matters running the server bare (npm run dev), so mirror that same
+// backward-compat check rather than always defaulting to the new name.
+function defaultSketchbookDir() {
+  const novaDir = path.join(os.homedir(), 'NovaESP');
+  const legacyDir = path.join(os.homedir(), 'Forge32');
+  if (!fs.existsSync(novaDir) && fs.existsSync(legacyDir)) return legacyDir;
+  return novaDir;
+}
+const SKETCHBOOK = process.env.FORGE32_SKETCHBOOK || defaultSketchbookDir();
 const ESP32_INDEX = 'https://espressif.github.io/arduino-esp32/package_esp32_index.json';
 
 /* ------------------------------------------------------------------ */
@@ -180,7 +190,7 @@ function safeSketchPath(rel) {
    Dot-prefixed so it reads as app metadata, not a file to open and edit,
    and the existing file-listing regex already ignores anything that isn't
    .ino/.h/.hpp/.c/.cpp so it never shows up as a tab either. */
-function pinsFilePath(dir) { return path.join(dir, '.forge32-pins.json'); }
+function pinsFilePath(dir) { return path.join(dir, '.novaesp-pins.json'); }
 
 async function readPinLabels(dir) {
   try { return JSON.parse(await fsp.readFile(pinsFilePath(dir), 'utf8')); }
@@ -196,7 +206,7 @@ const DEFAULT_SKETCH = `/*  Blink and talk
 void setup() {
   Serial.begin(115200);
   pinMode(LED_PIN, OUTPUT);
-  Serial.println("FORGE32 online");
+  Serial.println("NovaESP online");
 }
 
 void loop() {
@@ -390,12 +400,12 @@ function stopAllMonitors() {
 const SKETCH_FILE_RE = /\.(ino|h|hpp|c|cpp)$/i;
 const aiSessions = new Map(); // sessionId -> { dir, sketchName, changedFiles, createdAt }
 
-/* On macOS/Linux, FORGE32 (launched from Finder/Dock, or as a child of the
+/* On macOS/Linux, NovaESP (launched from Finder/Dock, or as a child of the
    Electron GUI process either way) inherits whatever PATH the login
    session started with -- it does NOT get whatever a user later added to
    ~/.zshrc or ~/.bash_profile, since those only run for interactive
    terminal shells. That's exactly why "npm install -g claude-code, then
-   restart FORGE32" alone doesn't work: FORGE32's own process never sees
+   restart NovaESP" alone doesn't work: NovaESP's own process never sees
    the updated PATH no matter how many times it's relaunched, only a full
    logout/login would refresh it. The standard fix (the same one editors
    like VS Code use) is to ask the user's actual login shell what its PATH
@@ -454,7 +464,7 @@ async function handleAiEdit(body, stm) {
 
   const realDir = safeSketchPath(sketchName);
   let tmpDir;
-  try { tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'forge32-ai-')); }
+  try { tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'novaesp-ai-')); }
   catch (e) { return stm.end({ t: 'err', line: 'Could not create a working copy: ' + e.message, fatal: true }); }
 
   // Snapshot the real sketch, then lay the caller's in-editor (possibly
@@ -838,7 +848,7 @@ async function handleSetup(body, stm) {
   const steps = [];
   if (!CLI) {
     stm.send({ t: 'err', line: 'arduino-cli was not found on this machine.' });
-    stm.send({ t: 'err', line: 'Install it, then restart FORGE32. See README for the one line installer.' });
+    stm.send({ t: 'err', line: 'Install it, then restart NovaESP. See README for the one line installer.' });
     return stm.end({ t: 'done', ok: false });
   }
   stm.send({ t: 'note', line: 'Writing arduino-cli configuration' });
@@ -1145,7 +1155,7 @@ const server = http.createServer(async (req, res) => {
 function banner(url) {
   const line = (s) => '  ' + s;
   console.log('');
-  console.log(line('FORGE32  an ESP32 workbench'));
+  console.log(line('NovaESP  an ESP32 workbench'));
   console.log(line('─'.repeat(46)));
   console.log(line('open        ' + url));
   console.log(line('sketchbook  ' + SKETCHBOOK));
@@ -1166,7 +1176,7 @@ async function main() {
   server.on('error', (e) => {
     if (e.code === 'EADDRINUSE') {
       console.error('\n  Port ' + PORT + ' is already in use.');
-      console.error('  Either FORGE32 is already running, or set a different port:');
+      console.error('  Either NovaESP is already running, or set a different port:');
       console.error('    FORGE32_PORT=4033 node server.js\n');
       process.exit(1);
     }
@@ -1179,7 +1189,7 @@ async function main() {
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
     stopAllMonitors();
-    console.log('\n  FORGE32 stopped.\n');
+    console.log('\n  NovaESP stopped.\n');
     process.exit(0);
   });
 }

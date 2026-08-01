@@ -39,9 +39,9 @@ const ARMED_AT = LOG.findIndex((l) => l.t.startsWith('Hash of data')) + 1;
 type Key = 'mac-arm' | 'mac-intel' | 'win';
 
 const TARGETS: Record<Key, { label: string; sub: string; href: string; file: string }> = {
-  'mac-arm': { label: 'Download for macOS', sub: 'Apple silicon · .dmg', href: '/mac', file: 'FORGE32-mac-arm64.dmg' },
-  'mac-intel': { label: 'Download for macOS', sub: 'Intel · .dmg', href: '/mac/intel', file: 'FORGE32-mac-x64.dmg' },
-  win: { label: 'Download for Windows', sub: '64-bit · .exe installer', href: '/win', file: 'FORGE32-win-x64.exe' },
+  'mac-arm': { label: 'Download for macOS', sub: 'Apple silicon · .dmg', href: '/mac', file: 'NovaESP-mac-arm64.dmg' },
+  'mac-intel': { label: 'Download for macOS', sub: 'Intel · .dmg', href: '/mac/intel', file: 'NovaESP-mac-x64.dmg' },
+  win: { label: 'Download for Windows', sub: '64-bit · .exe installer', href: '/win', file: 'NovaESP-win-x64.exe' },
 };
 
 /* One control picks the platform, so there is one URL on this page, not
@@ -292,7 +292,7 @@ export default function Page() {
             <h2>What happens the first time you open it</h2>
             <ol>
               <li>
-                FORGE32 downloads the ESP32 board support files, about 2 GB, and shows progress while
+                NovaESP downloads the ESP32 board support files, about 2 GB, and shows progress while
                 it works. This runs once per computer and needs no input from you.
               </li>
               <li>

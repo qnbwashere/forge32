@@ -1,6 +1,6 @@
-appId: dev.forge32.ide
-productName: FORGE32
-copyright: FORGE32
+appId: dev.novaesp.ide
+productName: NovaESP
+copyright: NovaESP
 
 directories:
   output: dist
@@ -26,7 +26,7 @@ extraResources:
 
 # ---------------------------------------------------------------------------
 # Artifact names deliberately carry NO version number. That keeps
-#   github.com/<owner>/<repo>/releases/latest/download/FORGE32-mac-arm64.dmg
+#   github.com/<owner>/<repo>/releases/latest/download/NovaESP-mac-arm64.dmg
 # valid forever, which is what the website redirects point at.
 # ---------------------------------------------------------------------------
 
@@ -53,11 +53,11 @@ mac:
   identity: null
   gatekeeperAssess: false
   extendInfo:
-    NSAppleEventsUsageDescription: FORGE32 needs this to open your sketchbook folder.
+    NSAppleEventsUsageDescription: NovaESP needs this to open your sketchbook folder.
 
 dmg:
-  artifactName: FORGE32-mac-${arch}.${ext}
-  title: FORGE32
+  artifactName: NovaESP-mac-${arch}.${ext}
+  title: NovaESP
   contents:
     - x: 140
       y: 200
@@ -70,10 +70,10 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  artifactName: FORGE32-win-x64.${ext}
+  artifactName: NovaESP-win-x64.${ext}
 
 nsis:
-  artifactName: FORGE32-win-x64.${ext}
+  artifactName: NovaESP-win-x64.${ext}
   oneClick: true
   perMachine: false
   allowToChangeInstallationDirectory: false

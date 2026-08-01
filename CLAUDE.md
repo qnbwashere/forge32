@@ -1,4 +1,4 @@
-# FORGE32
+# NovaESP
 
 A desktop IDE for ESP32 boards. Write code, compile it, flash it over USB,
 and watch the serial monitor, all without installing the Arduino IDE or a
@@ -28,7 +28,7 @@ These are load bearing. Breaking any of them silently breaks the download
 links.
 
 1. **Installer filenames carry no version number.** They are exactly
-   `FORGE32-mac-arm64.dmg`, `FORGE32-mac-x64.dmg`, `FORGE32-win-x64.exe`.
+   `NovaESP-mac-arm64.dmg`, `NovaESP-mac-x64.dmg`, `NovaESP-win-x64.exe`.
    That is what makes `releases/latest/download/<name>` a permanent URL.
    `electron-builder.yml` and `web/next.config.mjs` both depend on these
    exact strings matching.
@@ -116,7 +116,7 @@ npm run dev       # next dev
 
 3. Verify the chain: `curl -sI https://<site>/mac` should return 307 with a
    `location` pointing at
-   `github.com/<owner>/forge32/releases/latest/download/FORGE32-mac-arm64.dmg`,
+   `github.com/<owner>/forge32/releases/latest/download/NovaESP-mac-arm64.dmg`,
    and that location should resolve (not 404). Same for `/mac/intel` and
    `/win`. Load the site itself and confirm the version tag and file size
    render, which means the client side call to the GitHub releases API is
@@ -132,7 +132,7 @@ window opens (packaged builds only; dev runs skip it). Two paths, in order:
    This is a real silent updater: it downloads the new installer in the
    background and, once ready, asks the user to restart. On Windows this
    works unsigned. On macOS, Squirrel.Mac's silent apply is only reliable
-   for a signed/notarized app, and FORGE32 currently ships ad hoc signed
+   for a signed/notarized app, and NovaESP currently ships ad hoc signed
    only (see SETUP.md) -- so on macOS this path is best effort, not a
    promise, until real notarization is set up.
 2. **A plain HTTPS fallback** (`checkForUpdatesFallback()`), hitting
@@ -143,8 +143,10 @@ window opens (packaged builds only; dev runs skip it). Two paths, in order:
    fires if `electron-updater` errors, and also unconditionally ~15s after
    launch as insurance, specifically to cover the case where the silent
    path on an unsigned mac build neither errors nor actually applies. It is
-   idempotent per launch (`fallbackCheckDone`), and is skipped entirely if
-   the silent path already got as far as downloading an update.
+   idempotent per launch (`fallbackCheckInFlight` while a check is running,
+   `fallbackSucceeded` once one has shown a dialog this launch), and is
+   skipped entirely if the silent path already got as far as downloading
+   an update.
 
 Anyone currently on a build from before this feature shipped (v1.0.2 or
 earlier without it) has no updater code at all and must reinstall once by
