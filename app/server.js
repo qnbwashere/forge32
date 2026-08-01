@@ -142,9 +142,18 @@ function stream(stm, args, { onLine, label } = {}) {
     stm.send({ t: 'cmd', line: 'arduino-cli ' + args.join(' ') });
     const child = spawn(CLI, args, { env: process.env });
     let tail = { out: '', err: '' };
+    // esptool redraws its "Writing at 0x... (N %)" progress with a bare \r,
+    // not \r\n -- it's rewriting one terminal line in place, not starting a
+    // new one. Splitting only on \r?\n (which requires an actual \n) meant
+    // every \r-only update for whichever flash segment was largest got
+    // buffered together and never sent until either a real newline turned
+    // up (moving to the next segment) or the process exited, so the upload
+    // ring looked like it climbed a few percent, froze solid, then jumped
+    // straight to 100 -- it wasn't frozen, those updates just never left
+    // the buffer until the very end. Treat a bare \r as a line boundary too.
     const pump = (chunk, kind) => {
       tail[kind] += chunk;
-      const parts = tail[kind].split(/\r?\n/);
+      const parts = tail[kind].split(/\r\n|\r|\n/);
       tail[kind] = parts.pop();
       for (const line of parts) {
         stm.send({ t: kind === 'out' ? 'out' : 'err', line });
@@ -505,9 +514,12 @@ async function handleAiEdit(body, stm) {
     catch (e) { stm.send({ t: 'err', line: 'Could not start ' + bin + ': ' + e.message }); return resolve(-1); }
     const timer = setTimeout(() => { try { child.kill(); } catch {} }, 8 * 60 * 1000);
     const tail = { out: '', err: '' };
+    // Same bare-\r-as-line-boundary fix as stream() above -- these CLIs
+    // redraw spinners/progress in place too, and buffering that until a
+    // real \n showed up made the log look like it stalled.
     const pump = (chunk, kind) => {
       tail[kind] += chunk;
-      const parts = tail[kind].split(/\r?\n/);
+      const parts = tail[kind].split(/\r\n|\r|\n/);
       tail[kind] = parts.pop();
       for (const line of parts) if (line.trim()) stm.send({ t: kind, line });
     };
