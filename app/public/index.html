@@ -2961,10 +2961,14 @@ async function openAiPrompt() {
       subscription -- FORGE32 never asks for an API key.</p>
       <p style="margin-top:8px">Install and sign in to one of these, then try again:</p>
       <ul style="margin:8px 0 0 18px;line-height:1.7">
-        <li><b>Claude Code</b> -- <code>npm install -g @anthropic-ai/claude-code</code>, then run
-          <code>claude</code> once to sign in.</li>
-        <li><b>Codex</b> -- <code>npm install -g @openai/codex</code>, then run <code>codex</code>
-          once to sign in.</li>
+        <li><b>Claude Code</b> -- no Node.js needed:
+          <code>curl -fsSL https://claude.ai/install.sh | bash</code> (Mac/Linux) or
+          <code>irm https://claude.ai/install.ps1 | iex</code> (Windows PowerShell).
+          Or, with Node.js already installed, <code>npm install -g @anthropic-ai/claude-code</code>.
+          Then run <code>claude</code> once to sign in.</li>
+        <li><b>Codex</b> -- needs Node.js installed first (get it from
+          <code>nodejs.org</code>), then <code>npm install -g @openai/codex</code>.
+          Then run <code>codex</code> once to sign in.</li>
       </ul>`);
   }
   if (aiEditProvider === 'claude' && !avail.claude) aiEditProvider = 'codex';
