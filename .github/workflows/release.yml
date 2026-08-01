@@ -27,14 +27,17 @@ jobs:
             os: macos-14
             cli: arduino-cli_latest_macOS_ARM64.tar.gz
             flags: --mac --arm64
+            arch: arm64
           - label: macOS (Intel)
             os: macos-14
             cli: arduino-cli_latest_macOS_64bit.tar.gz
             flags: --mac --x64
+            arch: x64
           - label: Windows
             os: windows-latest
             cli: arduino-cli_latest_Windows_64bit.zip
             flags: --win --x64
+            arch: x64
 
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +74,77 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder ${{ matrix.flags }} --publish never
+
+      # Building each mac arch in its own job (rather than one combined
+      # --mac invocation covering both, which reliably broke dmgbuild's
+      # staging volume -- see the mac: block in electron-builder.yml) means
+      # electron-builder has no idea the other arch's build exists, so each
+      # one writes a latest-mac.yml that only lists itself. Give them
+      # distinct names now so downloading both into one folder later can't
+      # silently drop one -- they get merged into a single real
+      # latest-mac.yml in the publish job below.
+      - name: Disambiguate macOS update manifest
+        if: runner.os == 'macOS'
+        run: mv dist/latest-mac.yml dist/latest-mac-${{ matrix.arch }}.yml
+
+      # Each matrix job used to call softprops/action-gh-release directly,
+      # which meant all three jobs raced to create-or-update the SAME
+      # release for the SAME tag in parallel. Usually one job's "create"
+      # finished before the others got there and they just appended to it,
+      # but when two jobs hit that step close enough together, GitHub ended
+      # up with two release objects for one tag; whichever job's finalize
+      # call lost the race got "already_exists" back, retried against a
+      # release that could never become the canonical one, and failed --
+      # silently losing that platform's installer even though the file had
+      # already uploaded successfully. Stash artifacts here instead and let
+      # exactly one downstream job do the one and only release call.
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.label }}
+          path: |
+            dist/*.dmg
+            dist/*.exe
+            dist/*.zip
+            dist/*.blockmap
+            dist/latest*.yml
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+
+      # Combine both mac archs' file lists into the one latest-mac.yml
+      # electron-updater actually looks for (it picks the matching entry
+      # for whichever arch it's running on out of a single manifest's
+      # files: list). Without this step only the arch whose latest-mac.yml
+      # happened to end up as the "real" one ever got real update checks --
+      # exactly the kind of thing that made auto-update look broken.
+      - name: Merge macOS update manifests
+        run: |
+          pip install --quiet pyyaml
+          python3 - <<'PY'
+          import yaml
+
+          with open('dist/latest-mac-arm64.yml') as f:
+              arm = yaml.safe_load(f)
+          with open('dist/latest-mac-x64.yml') as f:
+              x64 = yaml.safe_load(f)
+
+          merged = dict(x64)
+          merged['files'] = (arm.get('files') or []) + (x64.get('files') or [])
+          with open('dist/latest-mac.yml', 'w') as f:
+              yaml.safe_dump(merged, f, default_flow_style=False)
+          print(open('dist/latest-mac.yml').read())
+          PY
+          rm dist/latest-mac-arm64.yml dist/latest-mac-x64.yml
 
       - name: Publish to release
         uses: softprops/action-gh-release@v2
