@@ -377,12 +377,38 @@ function stopAllMonitors() {
 const SKETCH_FILE_RE = /\.(ino|h|hpp|c|cpp)$/i;
 const aiSessions = new Map(); // sessionId -> { dir, sketchName, changedFiles, createdAt }
 
-/* shell:true so a bare command name resolves through PATH the same way a
-   terminal would, including npm's .cmd shims on Windows -- execFile alone
-   doesn't reliably find those. */
-function commandExists(cmd) {
+/* On macOS/Linux, FORGE32 (launched from Finder/Dock, or as a child of the
+   Electron GUI process either way) inherits whatever PATH the login
+   session started with -- it does NOT get whatever a user later added to
+   ~/.zshrc or ~/.bash_profile, since those only run for interactive
+   terminal shells. That's exactly why "npm install -g claude-code, then
+   restart FORGE32" alone doesn't work: FORGE32's own process never sees
+   the updated PATH no matter how many times it's relaunched, only a full
+   logout/login would refresh it. The standard fix (the same one editors
+   like VS Code use) is to ask the user's actual login shell what its PATH
+   is -- '-ilc' forces bash/zsh to source the same rc/profile files a real
+   terminal does -- and use that instead of trusting process.env.PATH. */
+let shellPathCache = null;
+function getShellPath() {
+  if (shellPathCache) return shellPathCache;
+  shellPathCache = new Promise((resolve) => {
+    if (process.platform === 'win32') return resolve(process.env.PATH || '');
+    const shell = process.env.SHELL || '/bin/zsh';
+    execFile(shell, ['-ilc', 'echo -n "$PATH"'], { timeout: 8000 }, (err, stdout) => {
+      const got = !err && stdout && stdout.trim();
+      resolve(got || process.env.PATH || '');
+    });
+  });
+  return shellPathCache;
+}
+
+/* shell:true so a bare command name resolves the same way a terminal
+   would, including npm's .cmd shims on Windows -- execFile alone doesn't
+   reliably find those. */
+async function commandExists(cmd) {
+  const PATH = await getShellPath();
   return new Promise((resolve) => {
-    execFile(cmd, ['--version'], { timeout: 5000, shell: true }, (err) => resolve(!err));
+    execFile(cmd, ['--version'], { timeout: 5000, shell: true, env: { ...process.env, PATH } }, (err) => resolve(!err));
   });
 }
 
@@ -444,9 +470,10 @@ async function handleAiEdit(body, stm) {
     ? ['exec', '--full-auto', '--skip-git-repo-check', instruction]
     : ['-p', instruction, '--permission-mode', 'acceptEdits'];
 
+  const PATH = await getShellPath();
   const code = await new Promise((resolve) => {
     let child;
-    try { child = spawn(bin, args, { cwd: tmpDir, env: process.env, shell: true }); }
+    try { child = spawn(bin, args, { cwd: tmpDir, env: { ...process.env, PATH }, shell: true }); }
     catch (e) { stm.send({ t: 'err', line: 'Could not start ' + bin + ': ' + e.message }); return resolve(-1); }
     const timer = setTimeout(() => { try { child.kill(); } catch {} }, 8 * 60 * 1000);
     const tail = { out: '', err: '' };
