@@ -314,6 +314,7 @@ function parseSizes(text) {
 
 const FALLBACK_BOARDS = [
   ['esp32:esp32:esp32', 'ESP32 Dev Module'],
+  ['esp32:esp32:arduino_nano_esp32', 'Arduino Nano ESP32'],
   ['esp32:esp32:esp32s3', 'ESP32-S3 Dev Module'],
   ['esp32:esp32:esp32s2', 'ESP32-S2 Dev Module'],
   ['esp32:esp32:esp32c3', 'ESP32-C3 Dev Module'],
